@@ -22,16 +22,15 @@ import asyncio
 import json
 import threading
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
 from beaconops.config.settings import Settings
 from beaconops.core.monitor import (
     CheckStatus,
-    MonitorCheck,
     MonitorInput,
     MonitorNotFoundError,
     MonitorService,
@@ -55,7 +54,6 @@ from beaconops.utils.validations import (
     validate_webhook_url,
 )
 
-
 # ---------------------------------------------------------------------------
 # Local HTTP test server
 # ---------------------------------------------------------------------------
@@ -66,12 +64,12 @@ class _TestHandler(BaseHTTPRequestHandler):
 
     server_version = "BeaconOpsTest/0.1"
 
-    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+    def log_message(self, format: str, *args: Any) -> None:
         """Silence the default stderr logging of the test server."""
 
         return
 
-    def do_GET(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+    def do_GET(self) -> None:
         """Serve deterministic responses based on the request path."""
 
         if self.path == "/ok":
@@ -115,7 +113,7 @@ class _TestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_POST(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+    def do_POST(self) -> None:
         """Accept webhook deliveries and record them on the server."""
 
         length = int(self.headers.get("Content-Length", "0"))
@@ -200,9 +198,7 @@ def test_create_monitor_persists_configuration(
     """A valid monitor is persisted with the provided configuration."""
 
     base_url, _ = http_server
-    monitor = monitor_service.create_monitor(
-        _make_input(f"{base_url}/ok", name="Health endpoint")
-    )
+    monitor = monitor_service.create_monitor(_make_input(f"{base_url}/ok", name="Health endpoint"))
 
     assert monitor.id is not None
     assert monitor.name == "Health endpoint"
@@ -235,9 +231,7 @@ def test_create_monitor_rejects_invalid_interval(
 
     base_url, _ = http_server
     with pytest.raises(MonitorValidationError):
-        monitor_service.create_monitor(
-            _make_input(f"{base_url}/ok", interval_seconds=1)
-        )
+        monitor_service.create_monitor(_make_input(f"{base_url}/ok", interval_seconds=1))
 
 
 def test_create_monitor_rejects_unsupported_method(
@@ -248,9 +242,7 @@ def test_create_monitor_rejects_unsupported_method(
 
     base_url, _ = http_server
     with pytest.raises(MonitorValidationError):
-        monitor_service.create_monitor(
-            _make_input(f"{base_url}/ok", method="TRACE")
-        )
+        monitor_service.create_monitor(_make_input(f"{base_url}/ok", method="TRACE"))
 
 
 def test_get_missing_monitor_raises(monitor_service: MonitorService) -> None:
@@ -428,9 +420,7 @@ def test_http_client_timeout(
     base_url, _ = http_server
     client = HttpClient(settings=settings)
     try:
-        result = _run(
-            client.check(f"{base_url}/slow", timeout_seconds=0.1)
-        )
+        result = _run(client.check(f"{base_url}/slow", timeout_seconds=0.1))
     finally:
         client.close()
 
@@ -443,9 +433,7 @@ def test_http_client_connection_error(settings: Settings) -> None:
 
     client = HttpClient(settings=settings)
     try:
-        result = _run(
-            client.check("http://127.0.0.1:1/never", timeout_seconds=0.5)
-        )
+        result = _run(client.check("http://127.0.0.1:1/never", timeout_seconds=0.5))
     finally:
         client.close()
 
@@ -519,9 +507,7 @@ def test_list_checks_filters_by_status(
     monitor = monitor_service.create_monitor(_make_input(f"{base_url}/ok"))
 
     _run(monitor_service.run_check(monitor.id))
-    monitor_service.update_monitor(
-        monitor.id, _make_input(f"{base_url}/error")
-    )
+    monitor_service.update_monitor(monitor.id, _make_input(f"{base_url}/error"))
     _run(monitor_service.run_check(monitor.id))
 
     successes = monitor_service.list_checks(monitor.id, status=CheckStatus.SUCCESS)
@@ -652,7 +638,7 @@ def test_notifier_deduplicates_events(
         event_type=NotificationEventType.SERVICE_UNAVAILABLE,
         monitor_id=1,
         monitor_name="Test",
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         message="down",
     )
 
@@ -682,7 +668,7 @@ def test_notifier_records_webhook_failure(
         event_type=NotificationEventType.SERVICE_RECOVERED,
         monitor_id=2,
         monitor_name="Test",
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         message="up",
     )
 
@@ -701,7 +687,7 @@ def test_notifier_skips_when_disabled(settings: Settings) -> None:
         event_type=NotificationEventType.LATENCY_EXCEEDED,
         monitor_id=3,
         monitor_name="Test",
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         message="slow",
     )
 
@@ -715,7 +701,7 @@ def test_notification_payload_excludes_credentials() -> None:
         event_type=NotificationEventType.SERVICE_UNAVAILABLE,
         monitor_id=4,
         monitor_name="Test",
-        occurred_at=datetime.now(timezone.utc),
+        occurred_at=datetime.now(UTC),
         message="down",
         details={"http_status": 500},
     )
@@ -761,9 +747,7 @@ def test_metrics_computation(
     assert len(successes) == 2
     assert failures == 1
 
-    latencies = [
-        c.response_time_ms for c in successes if c.response_time_ms is not None
-    ]
+    latencies = [c.response_time_ms for c in successes if c.response_time_ms is not None]
     assert latencies
     average = sum(latencies) / len(latencies)
     assert average > 0
@@ -801,7 +785,7 @@ def test_purge_checks_before_cutoff(
     monitor = monitor_service.create_monitor(_make_input(f"{base_url}/ok"))
     _run(monitor_service.run_check(monitor.id))
 
-    future = datetime.now(timezone.utc) + timedelta(hours=1)
+    future = datetime.now(UTC) + timedelta(hours=1)
     deleted = monitor_service.purge_checks_before(monitor.id, future)
 
     assert deleted == 1
@@ -861,6 +845,3 @@ def test_monitor_state_initialized_on_first_evaluation(
     assert state.status == MonitorStateStatus.AVAILABLE.value
     assert state.consecutive_successes == 1
     assert state.consecutive_failures == 0
-</｜｜DSML｜｜ parameter>
-</｜｜DSML｜｜ invoke>
-</｜｜DSML｜｜ calls>

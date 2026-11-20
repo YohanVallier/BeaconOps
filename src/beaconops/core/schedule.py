@@ -21,8 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -61,7 +60,7 @@ class MonitorScheduler:
     def __init__(
         self,
         service: MonitorService,
-        settings: Optional[Settings] = None,
+        settings: Settings | None = None,
     ) -> None:
         """Initialize the scheduler.
 
@@ -74,7 +73,7 @@ class MonitorScheduler:
         self._service: MonitorService = service
         self._settings: Settings = settings or get_settings()
         self._scheduler: AsyncIOScheduler = AsyncIOScheduler(
-            timezone=timezone.utc,
+            timezone=UTC,
             job_defaults={
                 "coalesce": True,
                 "max_instances": 1,
@@ -108,7 +107,7 @@ class MonitorScheduler:
 
         try:
             self._scheduler.start()
-        except Exception as exc:  # noqa: BLE001 - APScheduler raises broadly
+        except Exception as exc:
             logger.exception("Failed to start scheduler")
             raise SchedulerError("Unable to start scheduler") from exc
 
@@ -117,7 +116,7 @@ class MonitorScheduler:
 
         try:
             self.sync_jobs()
-        except Exception:  # noqa: BLE001 - keep scheduler alive on sync errors
+        except Exception:
             logger.exception("Failed to register initial monitor jobs")
 
     def shutdown(self, wait: bool = True) -> None:
@@ -132,7 +131,7 @@ class MonitorScheduler:
 
         try:
             self._scheduler.shutdown(wait=wait)
-        except Exception:  # noqa: BLE001 - defensive shutdown
+        except Exception:
             logger.exception("Error while shutting down scheduler")
         finally:
             self._started = False
@@ -160,7 +159,7 @@ class MonitorScheduler:
 
         try:
             active_monitors = self._service.list_active_monitors()
-        except Exception:  # noqa: BLE001 - database boundary
+        except Exception:
             logger.exception("Failed to load active monitors for scheduling")
             return
 
@@ -174,7 +173,7 @@ class MonitorScheduler:
             try:
                 self._scheduler.remove_job(job_id)
                 logger.info("Removed scheduled job %s", job_id)
-            except Exception:  # noqa: BLE001 - defensive
+            except Exception:
                 logger.exception("Failed to remove job %s", job_id)
 
         for job_id, interval_seconds in desired.items():
@@ -188,10 +187,8 @@ class MonitorScheduler:
                     args=[monitor_id],
                     replace_existing=True,
                 )
-                logger.debug(
-                    "Scheduled job %s every %ss", job_id, interval_seconds
-                )
-            except Exception:  # noqa: BLE001 - defensive
+                logger.debug("Scheduled job %s every %ss", job_id, interval_seconds)
+            except Exception:
                 logger.exception("Failed to schedule job %s", job_id)
 
     def schedule_monitor(self, monitor_id: int, interval_seconds: int) -> None:
@@ -209,9 +206,7 @@ class MonitorScheduler:
             raise MonitorValidationError("interval_seconds must be positive")
 
         if not self._started:
-            logger.debug(
-                "schedule_monitor called before start; job will be added on sync"
-            )
+            logger.debug("schedule_monitor called before start; job will be added on sync")
             return
 
         job_id = self._job_id(monitor_id)
@@ -224,15 +219,11 @@ class MonitorScheduler:
                 args=[monitor_id],
                 replace_existing=True,
             )
-        except Exception as exc:  # noqa: BLE001 - APScheduler boundary
+        except Exception as exc:
             logger.exception("Failed to schedule monitor id=%s", monitor_id)
-            raise SchedulerError(
-                f"Unable to schedule monitor {monitor_id}"
-            ) from exc
+            raise SchedulerError(f"Unable to schedule monitor {monitor_id}") from exc
 
-        logger.info(
-            "Scheduled monitor id=%s every %ss", monitor_id, interval_seconds
-        )
+        logger.info("Scheduled monitor id=%s every %ss", monitor_id, interval_seconds)
 
     def unschedule_monitor(self, monitor_id: int) -> None:
         """Remove the periodic job for a monitor, if present."""
@@ -241,16 +232,13 @@ class MonitorScheduler:
         try:
             self._scheduler.remove_job(job_id)
             logger.info("Unscheduled monitor id=%s", monitor_id)
-        except Exception:  # noqa: BLE001 - job may not exist
+        except Exception:
             logger.debug("No scheduled job to remove for monitor id=%s", monitor_id)
 
-    def list_jobs(self) -> list[tuple[str, Optional[datetime]]]:
+    def list_jobs(self) -> list[tuple[str, datetime | None]]:
         """Return scheduled jobs as ``(job_id, next_run_time)`` tuples."""
 
-        return [
-            (job.id, getattr(job, "next_run_time", None))
-            for job in self._scheduler.get_jobs()
-        ]
+        return [(job.id, getattr(job, "next_run_time", None)) for job in self._scheduler.get_jobs()]
 
     # -- Execution ----------------------------------------------------------
 
@@ -279,7 +267,7 @@ class MonitorScheduler:
             except asyncio.CancelledError:
                 logger.info("Scheduled check cancelled for monitor id=%s", monitor_id)
                 raise
-            except Exception:  # noqa: BLE001 - job boundary
+            except Exception:
                 logger.exception(
                     "Unexpected error during scheduled check for monitor id=%s",
                     monitor_id,

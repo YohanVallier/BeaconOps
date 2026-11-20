@@ -11,6 +11,7 @@ that the test suite is fully reproducible and hermetic.
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import Iterator
 from typing import Any
 
@@ -22,11 +23,9 @@ from beaconops.core.monitor import (
     Base,
     MonitorService,
     get_engine,
-    get_session_factory,
 )
 from beaconops.services.incident_identification import IncidentIdentifier
 from beaconops.utils.logging import configure_logging
-
 
 # ---------------------------------------------------------------------------
 # Environment isolation
@@ -144,6 +143,36 @@ def incident_identifier(
     """Provide an :class:`IncidentIdentifier` bound to the test database."""
 
     return IncidentIdentifier(settings=settings, session_factory=session_factory)
-</｜｜DSML｜｜ parameter>
-</｜｜DSML｜｜ invoke>
-</｜｜DSML｜｜ calls>
+
+
+# --- beaconops-offline-dns-fixture ---
+@pytest.fixture(autouse=True)
+def _mock_public_example_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve domínios example.* offline sem afetar localhost ou hosts inválidos."""
+    real_getaddrinfo = socket.getaddrinfo
+    public_domains = {"example.com", "example.org", "example.net"}
+
+    def _fake_getaddrinfo(host, port, *args, **kwargs):
+        if isinstance(host, bytes):
+            host_str = host.decode("utf-8", errors="ignore").lower().rstrip(".")
+        elif isinstance(host, str):
+            host_str = host.lower().rstrip(".")
+        else:
+            host_str = ""
+
+        if host_str in public_domains or any(
+            host_str.endswith(f".{domain}") for domain in public_domains
+        ):
+            resolved_port = port if isinstance(port, int) else 443
+            return [
+                (
+                    socket.AF_INET,
+                    socket.SOCK_STREAM,
+                    6,
+                    "",
+                    ("93.184.216.34", resolved_port),
+                )
+            ]
+        return real_getaddrinfo(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo)

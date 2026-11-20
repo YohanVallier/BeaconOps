@@ -25,9 +25,9 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
 
 import httpx
 
@@ -40,9 +40,9 @@ from beaconops.utils.validations import (
 
 __all__ = [
     "DeliveryResult",
+    "NotificationError",
     "NotificationEvent",
     "NotificationEventType",
-    "NotificationError",
     "Notifier",
 ]
 
@@ -63,7 +63,7 @@ class NotificationError(RuntimeError):
 # ---------------------------------------------------------------------------
 
 
-class NotificationEventType(str, Enum):
+class NotificationEventType(StrEnum):
     """Supported notification event types."""
 
     SERVICE_UNAVAILABLE = "service_unavailable"
@@ -128,8 +128,8 @@ class DeliveryResult:
     event: NotificationEvent
     webhook_url: str
     delivered: bool
-    status_code: Optional[int]
-    error_message: Optional[str]
+    status_code: int | None
+    error_message: str | None
     attempted_at: datetime
 
 
@@ -152,7 +152,7 @@ class Notifier:
 
     def __init__(
         self,
-        settings: Optional[Settings] = None,
+        settings: Settings | None = None,
         *,
         dedup_window_seconds: int = 300,
     ) -> None:
@@ -177,8 +177,8 @@ class Notifier:
     async def notify(
         self,
         event: NotificationEvent,
-        webhook_url: Optional[str] = None,
-    ) -> Optional[DeliveryResult]:
+        webhook_url: str | None = None,
+    ) -> DeliveryResult | None:
         """Deliver a notification event to a webhook.
 
         Args:
@@ -219,7 +219,7 @@ class Notifier:
                 delivered=False,
                 status_code=None,
                 error_message=f"Invalid webhook URL: {exc}",
-                attempted_at=datetime.now(timezone.utc),
+                attempted_at=datetime.now(UTC),
             )
 
         if self._is_duplicate(event):
@@ -242,7 +242,7 @@ class Notifier:
     def _is_duplicate(self, event: NotificationEvent) -> bool:
         """Return whether the event was already delivered within the window."""
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         key = event.dedup_key()
 
         # Prune expired entries to bound memory usage.
@@ -266,7 +266,7 @@ class Notifier:
     ) -> DeliveryResult:
         """Perform the HTTP POST delivery of an event to a webhook."""
 
-        attempted_at = datetime.now(timezone.utc)
+        attempted_at = datetime.now(UTC)
         payload = event.to_payload()
         timeout = self._settings.webhook_timeout_seconds
 
@@ -312,7 +312,7 @@ class Notifier:
                 error_message=f"Webhook delivery failed: {exc.__class__.__name__}",
                 attempted_at=attempted_at,
             )
-        except Exception as exc:  # noqa: BLE001 - delivery boundary
+        except Exception as exc:
             logger.exception(
                 "Unexpected error during webhook delivery for monitor_id=%s",
                 event.monitor_id,
@@ -327,7 +327,7 @@ class Notifier:
             )
 
         delivered = 200 <= response.status_code < 300
-        error_message: Optional[str] = None
+        error_message: str | None = None
         if not delivered:
             error_message = f"Webhook responded with HTTP {response.status_code}"
             logger.warning(
@@ -351,6 +351,3 @@ class Notifier:
             error_message=error_message,
             attempted_at=attempted_at,
         )
-</｜｜DSML｜｜ parameter>
-</｜｜DSML｜｜ invoke>
-</｜｜DSML｜｜ calls>
