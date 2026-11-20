@@ -19,9 +19,9 @@ The module must not import from :mod:`beaconops.api`, :mod:`beaconops.core`, or
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import sys
-from typing import Optional
 
 from beaconops.config.settings import Settings, get_settings
 
@@ -34,18 +34,14 @@ __all__ = [
 
 ROOT_LOGGER_NAME: str = "beaconops"
 
-DEFAULT_LOG_FORMAT: str = (
-    "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
-)
+DEFAULT_LOG_FORMAT: str = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 _DATE_FORMAT: str = "%Y-%m-%dT%H:%M:%S%z"
 
-_VALID_LEVELS: frozenset[str] = frozenset(
-    {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-)
+_VALID_LEVELS: frozenset[str] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
 
-def _resolve_level(level: Optional[str], settings: Settings) -> int:
+def _resolve_level(level: str | None, settings: Settings) -> int:
     """Resolve a log level name into a numeric logging level.
 
     Args:
@@ -62,17 +58,14 @@ def _resolve_level(level: Optional[str], settings: Settings) -> int:
 
     candidate = (level or settings.log_level or "INFO").upper()
     if candidate not in _VALID_LEVELS:
-        raise ValueError(
-            f"Invalid log level {candidate!r}; "
-            f"allowed: {sorted(_VALID_LEVELS)}"
-        )
+        raise ValueError(f"Invalid log level {candidate!r}; allowed: {sorted(_VALID_LEVELS)}")
     return getattr(logging, candidate)
 
 
 def configure_logging(
-    level: Optional[str] = None,
+    level: str | None = None,
     *,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
     force: bool = False,
 ) -> logging.Logger:
     """Configure the ``beaconops`` root logger.
@@ -105,17 +98,13 @@ def configure_logging(
     if force:
         for handler in list(logger.handlers):
             logger.removeHandler(handler)
-            try:
+            with contextlib.suppress(Exception):
                 handler.close()
-            except Exception:  # noqa: BLE001 - defensive handler cleanup
-                pass
 
     if not logger.handlers:
         handler = logging.StreamHandler(stream=sys.stderr)
         handler.setLevel(numeric_level)
-        handler.setFormatter(
-            logging.Formatter(fmt=DEFAULT_LOG_FORMAT, datefmt=_DATE_FORMAT)
-        )
+        handler.setFormatter(logging.Formatter(fmt=DEFAULT_LOG_FORMAT, datefmt=_DATE_FORMAT))
         logger.addHandler(handler)
     else:
         for handler in logger.handlers:
@@ -124,7 +113,7 @@ def configure_logging(
     return logger
 
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> logging.Logger:
     """Return a namespaced logger for the given module name.
 
     When ``name`` is provided and does not already start with the

@@ -23,7 +23,7 @@ imported by them.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import (
     BaseModel,
@@ -60,9 +60,7 @@ __all__ = [
 # Shared constraints
 # ---------------------------------------------------------------------------
 
-_ALLOWED_METHODS: frozenset[str] = frozenset(
-    {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
-)
+_ALLOWED_METHODS: frozenset[str] = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 _MIN_INTERVAL_SECONDS = 5
 _MAX_INTERVAL_SECONDS = 86_400
 _MIN_TIMEOUT_SECONDS = 0.1
@@ -137,7 +135,7 @@ class MonitorCreateRequest(BaseModel):
         ),
     ] = 200
     latency_threshold_ms: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             gt=0,
@@ -145,7 +143,7 @@ class MonitorCreateRequest(BaseModel):
         ),
     ] = None
     response_contains: Annotated[
-        Optional[str],
+        str | None,
         Field(
             default=None,
             max_length=4096,
@@ -168,8 +166,7 @@ class MonitorCreateRequest(BaseModel):
         normalized = value.strip().upper()
         if normalized not in _ALLOWED_METHODS:
             raise ValueError(
-                f"Unsupported HTTP method {value!r}; "
-                f"allowed: {sorted(_ALLOWED_METHODS)}"
+                f"Unsupported HTTP method {value!r}; allowed: {sorted(_ALLOWED_METHODS)}"
             )
         return normalized
 
@@ -215,16 +212,16 @@ class MonitorUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     name: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None, min_length=1, max_length=_MAX_NAME_LENGTH),
     ] = None
     url: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None, min_length=1, max_length=_MAX_URL_LENGTH),
     ] = None
-    method: Annotated[Optional[str], Field(default=None)] = None
+    method: Annotated[str | None, Field(default=None)] = None
     interval_seconds: Annotated[
-        Optional[int],
+        int | None,
         Field(
             default=None,
             ge=_MIN_INTERVAL_SECONDS,
@@ -232,7 +229,7 @@ class MonitorUpdateRequest(BaseModel):
         ),
     ] = None
     timeout_seconds: Annotated[
-        Optional[float],
+        float | None,
         Field(
             default=None,
             ge=_MIN_TIMEOUT_SECONDS,
@@ -240,22 +237,22 @@ class MonitorUpdateRequest(BaseModel):
         ),
     ] = None
     expected_status: Annotated[
-        Optional[int],
+        int | None,
         Field(default=None, ge=100, le=599),
     ] = None
     latency_threshold_ms: Annotated[
-        Optional[float],
+        float | None,
         Field(default=None, gt=0),
     ] = None
     response_contains: Annotated[
-        Optional[str],
+        str | None,
         Field(default=None, max_length=4096),
     ] = None
-    active: Annotated[Optional[bool], Field(default=None)] = None
+    active: Annotated[bool | None, Field(default=None)] = None
 
     @field_validator("method")
     @classmethod
-    def _validate_method(cls, value: Optional[str]) -> Optional[str]:
+    def _validate_method(cls, value: str | None) -> str | None:
         """Normalize and validate the HTTP method when provided."""
 
         if value is None:
@@ -263,14 +260,13 @@ class MonitorUpdateRequest(BaseModel):
         normalized = value.strip().upper()
         if normalized not in _ALLOWED_METHODS:
             raise ValueError(
-                f"Unsupported HTTP method {value!r}; "
-                f"allowed: {sorted(_ALLOWED_METHODS)}"
+                f"Unsupported HTTP method {value!r}; allowed: {sorted(_ALLOWED_METHODS)}"
             )
         return normalized
 
     @field_validator("url")
     @classmethod
-    def _validate_url_scheme(cls, value: Optional[str]) -> Optional[str]:
+    def _validate_url_scheme(cls, value: str | None) -> str | None:
         """Perform a cheap structural check on the URL scheme when provided."""
 
         if value is None:
@@ -282,7 +278,7 @@ class MonitorUpdateRequest(BaseModel):
         return stripped
 
     @model_validator(mode="after")
-    def _require_at_least_one_field(self) -> "MonitorUpdateRequest":
+    def _require_at_least_one_field(self) -> MonitorUpdateRequest:
         """Reject empty update payloads."""
 
         if not self.model_fields_set:
@@ -349,8 +345,8 @@ class MonitorResponse(BaseModel):
     interval_seconds: int
     timeout_seconds: float
     expected_status: int
-    latency_threshold_ms: Optional[float]
-    response_contains: Optional[str]
+    latency_threshold_ms: float | None
+    response_contains: str | None
     active: bool
     created_at: datetime
     updated_at: datetime
@@ -378,10 +374,10 @@ class CheckResponse(BaseModel):
     monitor_id: int
     checked_at: datetime
     status: CheckStatus
-    http_status: Optional[int]
-    response_time_ms: Optional[float]
-    error_message: Optional[str]
-    diagnostic: Optional[str]
+    http_status: int | None
+    response_time_ms: float | None
+    error_message: str | None
+    diagnostic: str | None
 
 
 class CheckListResponse(BaseModel):
@@ -407,12 +403,12 @@ class IncidentResponse(BaseModel):
     monitor_id: int
     status: IncidentStatus
     opened_at: datetime
-    closed_at: Optional[datetime]
-    trigger_check_id: Optional[int]
-    resolution_check_id: Optional[int]
-    reason: Optional[str]
-    resolution_reason: Optional[str]
-    duration_seconds: Optional[float]
+    closed_at: datetime | None
+    trigger_check_id: int | None
+    resolution_check_id: int | None
+    reason: str | None
+    resolution_reason: str | None
+    duration_seconds: float | None
 
 
 class IncidentListResponse(BaseModel):
@@ -442,10 +438,10 @@ class MetricsResponse(BaseModel):
     total_checks: int
     successful_checks: int
     failed_checks: int
-    uptime_ratio: Optional[float]
-    downtime_ratio: Optional[float]
-    average_latency_ms: Optional[float]
-    max_latency_ms: Optional[float]
+    uptime_ratio: float | None
+    downtime_ratio: float | None
+    average_latency_ms: float | None
+    max_latency_ms: float | None
     open_incidents: int
 
 
@@ -462,6 +458,3 @@ class HealthResponse(BaseModel):
     environment: str
     scheduler_running: bool
     timestamp: datetime
-</｜｜DSML｜｜ parameter>
-</｜｜DSML｜｜ invoke>
-</｜｜DSML｜｜ calls>

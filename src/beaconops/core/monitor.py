@@ -21,10 +21,11 @@ requests are subject to the SSRF protections implemented in
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Iterable, Optional, Sequence
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -53,8 +54,8 @@ from sqlalchemy.orm import (
 from beaconops.config.settings import Settings, get_settings
 from beaconops.services.http_client import (
     CheckOutcome,
-    HttpClient,
     HttpCheckResult,
+    HttpClient,
 )
 from beaconops.utils.logging import get_logger
 from beaconops.utils.validations import (
@@ -96,7 +97,7 @@ class MonitorNotFoundError(LookupError):
 # ---------------------------------------------------------------------------
 
 
-class CheckStatus(str, Enum):
+class CheckStatus(StrEnum):
     """Outcome classification of a single monitor check."""
 
     SUCCESS = "success"
@@ -124,26 +125,22 @@ class Monitor(Base):
     interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     timeout_seconds: Mapped[float] = mapped_column(Float, nullable=False, default=10.0)
     expected_status: Mapped[int] = mapped_column(Integer, nullable=False, default=200)
-    latency_threshold_ms: Mapped[Optional[float]] = mapped_column(
-        Float, nullable=True, default=None
-    )
-    response_contains: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, default=None
-    )
+    latency_threshold_ms: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    response_contains: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
-    checks: Mapped[list["MonitorCheck"]] = relationship(
+    checks: Mapped[list[MonitorCheck]] = relationship(
         "MonitorCheck",
         back_populates="monitor",
         cascade="all, delete-orphan",
@@ -166,22 +163,19 @@ class MonitorCheck(Base):
     checked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         index=True,
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
-    http_status: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    response_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    diagnostic: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    diagnostic: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     monitor: Mapped[Monitor] = relationship("Monitor", back_populates="checks")
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return (
-            f"<MonitorCheck id={self.id} monitor_id={self.monitor_id} "
-            f"status={self.status}>"
-        )
+        return f"<MonitorCheck id={self.id} monitor_id={self.monitor_id} status={self.status}>"
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +186,7 @@ class MonitorCheck(Base):
 _ENGINE_CACHE: dict[str, Engine] = {}
 
 
-def get_engine(settings: Optional[Settings] = None) -> Engine:
+def get_engine(settings: Settings | None = None) -> Engine:
     """Return a cached SQLAlchemy engine for the configured database URL.
 
     Args:
@@ -223,14 +217,14 @@ def get_engine(settings: Optional[Settings] = None) -> Engine:
     return engine
 
 
-def get_session_factory(settings: Optional[Settings] = None) -> sessionmaker[Session]:
+def get_session_factory(settings: Settings | None = None) -> sessionmaker[Session]:
     """Return a session factory bound to the configured engine."""
 
     engine = get_engine(settings)
     return sessionmaker(bind=engine, expire_on_commit=False, future=True)
 
 
-def init_db(settings: Optional[Settings] = None) -> None:
+def init_db(settings: Settings | None = None) -> None:
     """Create all tables if they do not yet exist."""
 
     engine = get_engine(settings)
@@ -253,10 +247,10 @@ class CheckResult:
     monitor_id: int
     status: CheckStatus
     checked_at: datetime
-    http_status: Optional[int]
-    response_time_ms: Optional[float]
-    error_message: Optional[str]
-    diagnostic: Optional[str]
+    http_status: int | None
+    response_time_ms: float | None
+    error_message: str | None
+    diagnostic: str | None
 
 
 @dataclass(frozen=True)
@@ -269,8 +263,8 @@ class MonitorInput:
     interval_seconds: int = 60
     timeout_seconds: float = 10.0
     expected_status: int = 200
-    latency_threshold_ms: Optional[float] = None
-    response_contains: Optional[str] = None
+    latency_threshold_ms: float | None = None
+    response_contains: str | None = None
     active: bool = True
 
 
@@ -294,20 +288,17 @@ def _validate_monitor_input(data: MonitorInput, settings: Settings) -> None:
     method = data.method.upper()
     if method not in _ALLOWED_METHODS:
         raise MonitorValidationError(
-            f"Unsupported HTTP method {data.method!r}; "
-            f"allowed: {sorted(_ALLOWED_METHODS)}"
+            f"Unsupported HTTP method {data.method!r}; allowed: {sorted(_ALLOWED_METHODS)}"
         )
 
     if not (_MIN_INTERVAL_SECONDS <= data.interval_seconds <= _MAX_INTERVAL_SECONDS):
         raise MonitorValidationError(
-            f"interval_seconds must be between {_MIN_INTERVAL_SECONDS} and "
-            f"{_MAX_INTERVAL_SECONDS}"
+            f"interval_seconds must be between {_MIN_INTERVAL_SECONDS} and {_MAX_INTERVAL_SECONDS}"
         )
 
     if not (_MIN_TIMEOUT_SECONDS <= data.timeout_seconds <= _MAX_TIMEOUT_SECONDS):
         raise MonitorValidationError(
-            f"timeout_seconds must be between {_MIN_TIMEOUT_SECONDS} and "
-            f"{_MAX_TIMEOUT_SECONDS}"
+            f"timeout_seconds must be between {_MIN_TIMEOUT_SECONDS} and {_MAX_TIMEOUT_SECONDS}"
         )
 
     if not (100 <= data.expected_status <= 599):
@@ -337,9 +328,9 @@ class MonitorService:
 
     def __init__(
         self,
-        settings: Optional[Settings] = None,
-        http_client: Optional[HttpClient] = None,
-        session_factory: Optional[sessionmaker[Session]] = None,
+        settings: Settings | None = None,
+        http_client: HttpClient | None = None,
+        session_factory: sessionmaker[Session] | None = None,
     ) -> None:
         """Initialize the service.
 
@@ -350,8 +341,8 @@ class MonitorService:
         """
 
         self._settings: Settings = settings or get_settings()
-        self._session_factory: sessionmaker[Session] = (
-            session_factory or get_session_factory(self._settings)
+        self._session_factory: sessionmaker[Session] = session_factory or get_session_factory(
+            self._settings
         )
         self._http_client: HttpClient = http_client or HttpClient(self._settings)
 
@@ -407,7 +398,7 @@ class MonitorService:
     def list_monitors(
         self,
         *,
-        active: Optional[bool] = None,
+        active: bool | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> Sequence[Monitor]:
@@ -456,7 +447,7 @@ class MonitorService:
             monitor.latency_threshold_ms = data.latency_threshold_ms
             monitor.response_contains = data.response_contains
             monitor.active = data.active
-            monitor.updated_at = datetime.now(timezone.utc)
+            monitor.updated_at = datetime.now(UTC)
 
             try:
                 session.commit()
@@ -477,7 +468,7 @@ class MonitorService:
             if monitor is None:
                 raise MonitorNotFoundError(f"Monitor {monitor_id} not found")
             monitor.active = active
-            monitor.updated_at = datetime.now(timezone.utc)
+            monitor.updated_at = datetime.now(UTC)
             try:
                 session.commit()
                 session.refresh(monitor)
@@ -520,7 +511,7 @@ class MonitorService:
         """
 
         monitor = self.get_monitor(monitor_id)
-        checked_at = datetime.now(timezone.utc)
+        checked_at = datetime.now(UTC)
 
         try:
             http_result: HttpCheckResult = await self._http_client.check(
@@ -539,7 +530,7 @@ class MonitorService:
                 error_message=f"Validation error: {exc}",
                 body_excerpt=None,
             )
-        except Exception as exc:  # noqa: BLE001 - defensive boundary
+        except Exception as exc:
             logger.exception("Unexpected error while checking monitor id=%s", monitor_id)
             http_result = HttpCheckResult(
                 outcome=CheckOutcome.ERROR,
@@ -606,9 +597,9 @@ class MonitorService:
         self,
         monitor_id: int,
         *,
-        status: Optional[CheckStatus] = None,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
+        status: CheckStatus | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> Sequence[MonitorCheck]:
@@ -639,9 +630,7 @@ class MonitorService:
     def count_checks(self, monitor_id: int) -> int:
         """Return the total number of persisted checks for a monitor."""
 
-        stmt = select(func.count(MonitorCheck.id)).where(
-            MonitorCheck.monitor_id == monitor_id
-        )
+        stmt = select(func.count(MonitorCheck.id)).where(MonitorCheck.monitor_id == monitor_id)
         with self._session_factory() as session:
             return int(session.scalar(stmt) or 0)
 

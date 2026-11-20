@@ -19,10 +19,10 @@ an :class:`HttpCheckResult` describing the outcome of a check.
 from __future__ import annotations
 
 import logging
+import ssl
 import time
 from dataclasses import dataclass
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 import httpx
 
@@ -58,7 +58,7 @@ class HttpClientError(RuntimeError):
 # ---------------------------------------------------------------------------
 
 
-class CheckOutcome(str, Enum):
+class CheckOutcome(StrEnum):
     """Classification of a single HTTP check outcome."""
 
     SUCCESS = "success"
@@ -85,19 +85,17 @@ class HttpCheckResult:
     """
 
     outcome: CheckOutcome
-    status_code: Optional[int]
-    response_time_ms: Optional[float]
-    error_message: Optional[str]
-    body_excerpt: Optional[str]
+    status_code: int | None
+    response_time_ms: float | None
+    error_message: str | None
+    body_excerpt: str | None
 
 
 # ---------------------------------------------------------------------------
 # Client
 # ---------------------------------------------------------------------------
 
-_ALLOWED_METHODS: frozenset[str] = frozenset(
-    {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
-)
+_ALLOWED_METHODS: frozenset[str] = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 
 
 class HttpClient:
@@ -113,7 +111,7 @@ class HttpClient:
     programming errors (e.g. unsupported HTTP method).
     """
 
-    def __init__(self, settings: Optional[Settings] = None) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
         """Initialize the client.
 
         Args:
@@ -122,7 +120,7 @@ class HttpClient:
         """
 
         self._settings: Settings = settings or get_settings()
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     # -- Lifecycle ----------------------------------------------------------
 
@@ -154,7 +152,7 @@ class HttpClient:
         if self._client is not None:
             try:
                 await self._client.aclose()
-            except Exception:  # noqa: BLE001 - defensive close
+            except Exception:
                 logger.exception("Error while closing HTTP client")
             finally:
                 self._client = None
@@ -169,7 +167,7 @@ class HttpClient:
         if self._client is not None:
             try:
                 self._client._transport = None  # type: ignore[attr-defined]
-            except Exception:  # noqa: BLE001 - defensive
+            except Exception:
                 logger.debug("Unable to release HTTP client transport synchronously")
             finally:
                 self._client = None
@@ -180,9 +178,9 @@ class HttpClient:
         self,
         url: str,
         method: str = "GET",
-        timeout_seconds: Optional[float] = None,
+        timeout_seconds: float | None = None,
         expected_status: int = 200,
-        response_contains: Optional[str] = None,
+        response_contains: str | None = None,
     ) -> HttpCheckResult:
         """Execute a single HTTP check against ``url``.
 
@@ -206,8 +204,7 @@ class HttpClient:
         normalized_method = method.upper()
         if normalized_method not in _ALLOWED_METHODS:
             raise HttpClientError(
-                f"Unsupported HTTP method {method!r}; "
-                f"allowed: {sorted(_ALLOWED_METHODS)}"
+                f"Unsupported HTTP method {method!r}; allowed: {sorted(_ALLOWED_METHODS)}"
             )
 
         try:
@@ -223,9 +220,7 @@ class HttpClient:
             )
 
         timeout = (
-            timeout_seconds
-            if timeout_seconds is not None
-            else self._settings.http_timeout_seconds
+            timeout_seconds if timeout_seconds is not None else self._settings.http_timeout_seconds
         )
 
         client = self._get_client()
@@ -248,7 +243,7 @@ class HttpClient:
                 error_message="Request timed out",
                 body_excerpt=None,
             )
-        except httpx.SSLError as exc:
+        except ssl.SSLError as exc:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             logger.warning(
                 "SSL certificate validation failed for URL %r: %s",
@@ -264,9 +259,7 @@ class HttpClient:
             )
         except httpx.HTTPError as exc:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
-            logger.warning(
-                "Connection error for URL %r: %s", url, exc.__class__.__name__
-            )
+            logger.warning("Connection error for URL %r: %s", url, exc.__class__.__name__)
             return HttpCheckResult(
                 outcome=CheckOutcome.CONNECTION_ERROR,
                 status_code=None,
@@ -284,7 +277,7 @@ class HttpClient:
                 error_message=f"Redirect rejected: {exc}",
                 body_excerpt=None,
             )
-        except Exception as exc:  # noqa: BLE001 - check boundary
+        except Exception as exc:
             elapsed_ms = (time.perf_counter() - started) * 1000.0
             logger.exception("Unexpected error during check for URL %r", url)
             return HttpCheckResult(
@@ -312,8 +305,7 @@ class HttpClient:
                 status_code=status_code,
                 response_time_ms=elapsed_ms,
                 error_message=(
-                    f"Unexpected HTTP status {status_code} "
-                    f"(expected {expected_status})"
+                    f"Unexpected HTTP status {status_code} (expected {expected_status})"
                 ),
                 body_excerpt=body_excerpt,
             )
@@ -352,7 +344,7 @@ class HttpClient:
         client: httpx.AsyncClient,
         url: str,
         method: str,
-        timeout: float,
+        timeout: float,  # noqa: ASYNC109
     ) -> httpx.Response:
         """Perform a request, following redirects with re-validation.
 
@@ -396,11 +388,9 @@ class HttpClient:
 
             current_url = next_url
 
-        raise ValidationError(
-            f"Exceeded maximum of {max_redirects} redirects"
-        )
+        raise ValidationError(f"Exceeded maximum of {max_redirects} redirects")
 
-    def _read_body_excerpt(self, response: httpx.Response) -> Optional[str]:
+    def _read_body_excerpt(self, response: httpx.Response) -> str | None:
         """Return a truncated excerpt of the response body, if available.
 
         The excerpt is bounded by ``http_max_response_bytes`` to avoid
@@ -410,7 +400,7 @@ class HttpClient:
 
         try:
             content = response.content
-        except Exception:  # noqa: BLE001 - body may not be loaded
+        except Exception:
             return None
 
         if not content:

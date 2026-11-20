@@ -25,7 +25,6 @@ import os
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 __all__ = [
     "Settings",
@@ -52,13 +51,9 @@ class SettingsError(ValueError):
 
 _ENV_PREFIX = "BEACONOPS_"
 
-_VALID_ENVIRONMENTS: frozenset[str] = frozenset(
-    {"development", "test", "production"}
-)
+_VALID_ENVIRONMENTS: frozenset[str] = frozenset({"development", "test", "production"})
 
-_VALID_LOG_LEVELS: frozenset[str] = frozenset(
-    {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-)
+_VALID_LOG_LEVELS: frozenset[str] = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
 
 def _load_dotenv(path: Path) -> None:
@@ -102,7 +97,7 @@ def _load_dotenv(path: Path) -> None:
             os.environ[key] = value
 
 
-def _get_raw(name: str) -> Optional[str]:
+def _get_raw(name: str) -> str | None:
     """Return the raw environment value for a prefixed setting name."""
 
     return os.environ.get(f"{_ENV_PREFIX}{name}")
@@ -117,7 +112,7 @@ def _get_str(name: str, default: str) -> str:
     return raw
 
 
-def _get_optional_str(name: str) -> Optional[str]:
+def _get_optional_str(name: str) -> str | None:
     """Return an optional string setting, or ``None`` when unset/empty."""
 
     raw = _get_raw(name)
@@ -139,12 +134,10 @@ def _get_bool(name: str, default: bool) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
 
-    raise SettingsError(
-        f"Invalid boolean value for {_ENV_PREFIX}{name}: {raw!r}"
-    )
+    raise SettingsError(f"Invalid boolean value for {_ENV_PREFIX}{name}: {raw!r}")
 
 
-def _get_int(name: str, default: int, *, minimum: Optional[int] = None) -> int:
+def _get_int(name: str, default: int, *, minimum: int | None = None) -> int:
     """Return an integer setting, validating an optional lower bound."""
 
     raw = _get_raw(name)
@@ -154,18 +147,14 @@ def _get_int(name: str, default: int, *, minimum: Optional[int] = None) -> int:
     try:
         value = int(raw.strip())
     except ValueError as exc:
-        raise SettingsError(
-            f"Invalid integer value for {_ENV_PREFIX}{name}: {raw!r}"
-        ) from exc
+        raise SettingsError(f"Invalid integer value for {_ENV_PREFIX}{name}: {raw!r}") from exc
 
     if minimum is not None and value < minimum:
-        raise SettingsError(
-            f"{_ENV_PREFIX}{name} must be >= {minimum}, got {value}"
-        )
+        raise SettingsError(f"{_ENV_PREFIX}{name} must be >= {minimum}, got {value}")
     return value
 
 
-def _get_float(name: str, default: float, *, minimum: Optional[float] = None) -> float:
+def _get_float(name: str, default: float, *, minimum: float | None = None) -> float:
     """Return a float setting, validating an optional lower bound."""
 
     raw = _get_raw(name)
@@ -175,14 +164,10 @@ def _get_float(name: str, default: float, *, minimum: Optional[float] = None) ->
     try:
         value = float(raw.strip())
     except ValueError as exc:
-        raise SettingsError(
-            f"Invalid float value for {_ENV_PREFIX}{name}: {raw!r}"
-        ) from exc
+        raise SettingsError(f"Invalid float value for {_ENV_PREFIX}{name}: {raw!r}") from exc
 
     if minimum is not None and value < minimum:
-        raise SettingsError(
-            f"{_ENV_PREFIX}{name} must be >= {minimum}, got {value}"
-        )
+        raise SettingsError(f"{_ENV_PREFIX}{name} must be >= {minimum}, got {value}")
     return value
 
 
@@ -206,13 +191,9 @@ def _get_ports(name: str) -> frozenset[int]:
         try:
             port = int(item)
         except ValueError as exc:
-            raise SettingsError(
-                f"Invalid port value for {_ENV_PREFIX}{name}: {item!r}"
-            ) from exc
+            raise SettingsError(f"Invalid port value for {_ENV_PREFIX}{name}: {item!r}") from exc
         if not (1 <= port <= 65535):
-            raise SettingsError(
-                f"Port {port} for {_ENV_PREFIX}{name} must be between 1 and 65535"
-            )
+            raise SettingsError(f"Port {port} for {_ENV_PREFIX}{name} must be between 1 and 65535")
         ports.add(port)
     return frozenset(ports)
 
@@ -253,7 +234,7 @@ class Settings:
 
     # Notifications
     notifications_enabled: bool = True
-    default_webhook_url: Optional[str] = None
+    default_webhook_url: str | None = None
     webhook_timeout_seconds: float = 5.0
 
     # Security / SSRF protection
@@ -263,10 +244,10 @@ class Settings:
     max_redirects: int = 3
 
     # API security
-    admin_api_key: Optional[str] = None
+    admin_api_key: str | None = None
 
     # Server
-    host: str = "0.0.0.0"
+    host: str = "0.0.0.0"  # noqa: S104
     port: int = 8000
     reload: bool = False
 
@@ -319,8 +300,7 @@ def _build_settings() -> Settings:
     env = _get_str("ENV", "development").strip().lower()
     if env not in _VALID_ENVIRONMENTS:
         raise SettingsError(
-            f"Invalid {_ENV_PREFIX}ENV value {env!r}; "
-            f"allowed: {sorted(_VALID_ENVIRONMENTS)}"
+            f"Invalid {_ENV_PREFIX}ENV value {env!r}; allowed: {sorted(_VALID_ENVIRONMENTS)}"
         )
 
     log_level = _get_str("LOG_LEVEL", "INFO").strip().upper()
@@ -334,27 +314,19 @@ def _build_settings() -> Settings:
     if not database_url:
         raise SettingsError(f"{_ENV_PREFIX}DATABASE_URL must not be empty")
 
-    http_timeout_seconds = _get_float(
-        "HTTP_TIMEOUT_SECONDS", 10.0, minimum=0.1
-    )
-    http_max_response_bytes = _get_int(
-        "HTTP_MAX_RESPONSE_BYTES", 1_048_576, minimum=1
-    )
+    http_timeout_seconds = _get_float("HTTP_TIMEOUT_SECONDS", 10.0, minimum=0.1)
+    http_max_response_bytes = _get_int("HTTP_MAX_RESPONSE_BYTES", 1_048_576, minimum=1)
     max_concurrent_checks = _get_int("MAX_CONCURRENT_CHECKS", 10, minimum=1)
 
     scheduler_enabled = _get_bool("SCHEDULER_ENABLED", True)
-    default_check_interval_seconds = _get_int(
-        "DEFAULT_CHECK_INTERVAL_SECONDS", 60, minimum=1
-    )
+    default_check_interval_seconds = _get_int("DEFAULT_CHECK_INTERVAL_SECONDS", 60, minimum=1)
 
     failure_threshold = _get_int("FAILURE_THRESHOLD", 3, minimum=1)
     recovery_threshold = _get_int("RECOVERY_THRESHOLD", 2, minimum=1)
 
     notifications_enabled = _get_bool("NOTIFICATIONS_ENABLED", True)
     default_webhook_url = _get_optional_str("DEFAULT_WEBHOOK_URL")
-    webhook_timeout_seconds = _get_float(
-        "WEBHOOK_TIMEOUT_SECONDS", 5.0, minimum=0.1
-    )
+    webhook_timeout_seconds = _get_float("WEBHOOK_TIMEOUT_SECONDS", 5.0, minimum=0.1)
 
     allow_private_targets = _get_bool("ALLOW_PRIVATE_TARGETS", False)
     allowed_hosts = _get_csv("ALLOWED_HOSTS")
@@ -363,7 +335,7 @@ def _build_settings() -> Settings:
 
     admin_api_key = _get_optional_str("ADMIN_API_KEY")
 
-    host = _get_str("HOST", "0.0.0.0").strip()
+    host = _get_str("HOST", "0.0.0.0").strip()  # noqa: S104
     port = _get_int("PORT", 8000, minimum=1)
     if port > 65535:
         raise SettingsError(f"{_ENV_PREFIX}PORT must be <= 65535, got {port}")

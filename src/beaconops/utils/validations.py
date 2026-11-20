@@ -33,16 +33,16 @@ from __future__ import annotations
 import ipaddress
 import logging
 import socket
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 from urllib.parse import urlsplit
 
 from beaconops.config.settings import Settings, get_settings
 from beaconops.utils.logging import get_logger
 
 __all__ = [
-    "ValidationError",
     "UrlValidationResult",
+    "ValidationError",
     "is_private_address",
     "resolve_hostname",
     "validate_monitor_url",
@@ -133,9 +133,7 @@ def is_private_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -
         return True
     if address.is_reserved:
         return True
-    if address.is_unspecified:
-        return True
-    return False
+    return bool(address.is_unspecified)
 
 
 # ---------------------------------------------------------------------------
@@ -168,16 +166,16 @@ def resolve_hostname(hostname: str) -> tuple[str, ...]:
             proto=socket.IPPROTO_TCP,
             timeout=_DNS_RESOLUTION_TIMEOUT,
         )
-    except socket.timeout:
+    except TimeoutError:
         logger.debug("DNS resolution timed out for hostname %r", hostname)
         return ()
     except socket.gaierror:
         logger.debug("DNS resolution failed for hostname %r", hostname)
         return ()
-    except socket.error as exc:
+    except OSError as exc:
         logger.debug("Socket error while resolving hostname %r: %s", hostname, exc)
         return ()
-    except Exception as exc:  # noqa: BLE001 - defensive boundary
+    except Exception as exc:
         logger.debug("Unexpected error while resolving hostname %r: %s", hostname, exc)
         return ()
 
@@ -225,8 +223,7 @@ def _parse_url(url: str) -> tuple[str, str, int]:
     scheme = parts.scheme.lower()
     if scheme not in _ALLOWED_SCHEMES:
         raise ValidationError(
-            f"Unsupported URL scheme {parts.scheme!r}; "
-            f"allowed: {sorted(_ALLOWED_SCHEMES)}"
+            f"Unsupported URL scheme {parts.scheme!r}; allowed: {sorted(_ALLOWED_SCHEMES)}"
         )
 
     hostname = parts.hostname
@@ -262,9 +259,7 @@ def _validate_port(port: int, settings: Settings) -> None:
     if not allowed_ports:
         return
     if port not in allowed_ports:
-        raise ValidationError(
-            f"Port {port} is not permitted; allowed: {sorted(allowed_ports)}"
-        )
+        raise ValidationError(f"Port {port} is not permitted; allowed: {sorted(allowed_ports)}")
 
 
 def _validate_hostname(hostname: str, settings: Settings) -> None:
@@ -283,9 +278,7 @@ def _validate_hostname(hostname: str, settings: Settings) -> None:
         return
     normalized = hostname.lower()
     if normalized not in {host.lower() for host in allowed_hosts}:
-        raise ValidationError(
-            f"Hostname {hostname!r} is not in the allowed hosts list"
-        )
+        raise ValidationError(f"Hostname {hostname!r} is not in the allowed hosts list")
 
 
 def _validate_addresses(
@@ -372,7 +365,7 @@ def _validate_url(url: str, settings: Settings) -> UrlValidationResult:
 
 def validate_monitor_url(
     url: str,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> UrlValidationResult:
     """Validate a monitor URL against the SSRF policy.
 
@@ -394,7 +387,7 @@ def validate_monitor_url(
 
 def validate_webhook_url(
     url: str,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> UrlValidationResult:
     """Validate a webhook URL against the SSRF policy.
 
@@ -418,7 +411,7 @@ def validate_webhook_url(
 
 def validate_redirect_target(
     url: str,
-    settings: Optional[Settings] = None,
+    settings: Settings | None = None,
 ) -> UrlValidationResult:
     """Validate a redirect target against the SSRF policy.
 
@@ -448,10 +441,10 @@ def validate_redirect_target(
 
 
 def validate_response_body(
-    body: Optional[str],
+    body: str | None,
     *,
-    expected_contains: Optional[str] = None,
-    max_bytes: Optional[int] = None,
+    expected_contains: str | None = None,
+    max_bytes: int | None = None,
 ) -> None:
     """Validate an HTTP response body against expected content.
 
@@ -478,9 +471,7 @@ def validate_response_body(
     if max_bytes is not None:
         encoded_length = len(body.encode("utf-8", errors="replace"))
         if encoded_length > max_bytes:
-            raise ValidationError(
-                f"Response body exceeds maximum size of {max_bytes} bytes"
-            )
+            raise ValidationError(f"Response body exceeds maximum size of {max_bytes} bytes")
 
     if expected_contains is not None and expected_contains not in body:
         raise ValidationError("Response body did not contain expected content")

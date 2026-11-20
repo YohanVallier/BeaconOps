@@ -20,9 +20,10 @@ by them, so that monitoring operations remain independent of the HTTP routes.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, AsyncIterator, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import (
     Depends,
@@ -86,7 +87,7 @@ logger: logging.Logger = get_logger(__name__)
 def get_monitor_service(request: Request) -> MonitorService:
     """Return the shared :class:`MonitorService` from application state."""
 
-    service: Optional[MonitorService] = getattr(request.app.state, "monitor_service", None)
+    service: MonitorService | None = getattr(request.app.state, "monitor_service", None)
     if service is None:  # pragma: no cover - defensive
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -98,9 +99,7 @@ def get_monitor_service(request: Request) -> MonitorService:
 def get_incident_identifier(request: Request) -> IncidentIdentifier:
     """Return the shared :class:`IncidentIdentifier` from application state."""
 
-    identifier: Optional[IncidentIdentifier] = getattr(
-        request.app.state, "incident_identifier", None
-    )
+    identifier: IncidentIdentifier | None = getattr(request.app.state, "incident_identifier", None)
     if identifier is None:  # pragma: no cover - defensive
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -109,7 +108,7 @@ def get_incident_identifier(request: Request) -> IncidentIdentifier:
     return identifier
 
 
-def get_scheduler(request: Request) -> Optional[MonitorScheduler]:
+def get_scheduler(request: Request) -> MonitorScheduler | None:
     """Return the shared :class:`MonitorScheduler`, if enabled."""
 
     return getattr(request.app.state, "scheduler", None)
@@ -122,7 +121,7 @@ def get_scheduler(request: Request) -> Optional[MonitorScheduler]:
 
 def require_admin_api_key(
     request: Request,
-    x_api_key: Annotated[Optional[str], Header(alias="X-API-Key")] = None,
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None,
 ) -> None:
     """Enforce the administrative API key on protected endpoints.
 
@@ -216,7 +215,7 @@ def _serialize_incident(incident: Incident) -> IncidentResponse:
 # ---------------------------------------------------------------------------
 
 
-def create_app(settings: Optional[Settings] = None) -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Create and configure the BeaconOps FastAPI application.
 
     Args:
@@ -234,13 +233,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         """Manage application startup and shutdown."""
 
-        logger.info(
-            "Starting BeaconOps %s (env=%s)", __version__, resolved_settings.env
-        )
+        logger.info("Starting BeaconOps %s (env=%s)", __version__, resolved_settings.env)
 
         try:
             init_db(resolved_settings)
-        except Exception:  # noqa: BLE001 - startup boundary
+        except Exception:
             logger.exception("Failed to initialize database schema")
             raise
 
@@ -267,12 +264,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             if scheduler is not None:
                 try:
                     scheduler.shutdown(wait=False)
-                except Exception:  # noqa: BLE001 - shutdown boundary
+                except Exception:
                     logger.exception("Error while shutting down scheduler")
 
             try:
                 await monitor_service.aclose()
-            except Exception:  # noqa: BLE001 - shutdown boundary
+            except Exception:
                 logger.exception("Error while closing monitor service")
 
             logger.info("BeaconOps stopped")
@@ -280,27 +277,21 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app = FastAPI(
         title="BeaconOps",
         version=__version__,
-        description=(
-            "Self-managed API availability and performance monitoring platform."
-        ),
+        description=("Self-managed API availability and performance monitoring platform."),
         lifespan=lifespan,
     )
 
     # -- Exception handlers -------------------------------------------------
 
     @app.exception_handler(MonitorNotFoundError)
-    async def _handle_not_found(
-        _request: Request, exc: MonitorNotFoundError
-    ) -> JSONResponse:
+    async def _handle_not_found(_request: Request, exc: MonitorNotFoundError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"detail": str(exc)},
         )
 
     @app.exception_handler(MonitorValidationError)
-    async def _handle_validation(
-        _request: Request, exc: MonitorValidationError
-    ) -> JSONResponse:
+    async def _handle_validation(_request: Request, exc: MonitorValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(exc)},
@@ -324,7 +315,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             version=__version__,
             environment=current_settings.env,
             scheduler_running=bool(scheduler is not None and scheduler.running),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
     # -- Monitors -----------------------------------------------------------
@@ -351,9 +342,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             try:
                 scheduler.schedule_monitor(monitor.id, monitor.interval_seconds)
             except SchedulerError:
-                logger.exception(
-                    "Failed to schedule newly created monitor id=%s", monitor.id
-                )
+                logger.exception("Failed to schedule newly created monitor id=%s", monitor.id)
 
         return _serialize_monitor(monitor)
 
@@ -366,7 +355,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     )
     async def list_monitors(
         request: Request,
-        active: Annotated[Optional[bool], Query()] = None,
+        active: Annotated[bool | None, Query()] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> MonitorListResponse:
@@ -418,9 +407,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 try:
                     scheduler.schedule_monitor(monitor.id, monitor.interval_seconds)
                 except SchedulerError:
-                    logger.exception(
-                        "Failed to reschedule monitor id=%s", monitor.id
-                    )
+                    logger.exception("Failed to reschedule monitor id=%s", monitor.id)
             else:
                 scheduler.unschedule_monitor(monitor.id)
 
@@ -463,10 +450,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
         try:
             await identifier.evaluate(monitor, result)
-        except Exception:  # noqa: BLE001 - incident evaluation boundary
-            logger.exception(
-                "Failed to evaluate incident state for monitor id=%s", monitor_id
-            )
+        except Exception:
+            logger.exception("Failed to evaluate incident state for monitor id=%s", monitor_id)
 
         checks = service.list_checks(monitor_id, limit=1, offset=0)
         if not checks:
@@ -488,9 +473,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def list_checks(
         monitor_id: int,
         request: Request,
-        check_status: Annotated[Optional[CheckStatus], Query(alias="status")] = None,
-        since: Annotated[Optional[datetime], Query()] = None,
-        until: Annotated[Optional[datetime], Query()] = None,
+        check_status: Annotated[CheckStatus | None, Query(alias="status")] = None,
+        since: Annotated[datetime | None, Query()] = None,
+        until: Annotated[datetime | None, Query()] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> CheckListResponse:
@@ -525,10 +510,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     )
     async def list_incidents(
         request: Request,
-        monitor_id: Annotated[Optional[int], Query(ge=1)] = None,
-        incident_status: Annotated[
-            Optional[IncidentStatus], Query(alias="status")
-        ] = None,
+        monitor_id: Annotated[int | None, Query(ge=1)] = None,
+        incident_status: Annotated[IncidentStatus | None, Query(alias="status")] = None,
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         offset: Annotated[int, Query(ge=0)] = 0,
     ) -> IncidentListResponse:
@@ -585,19 +568,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         service.get_monitor(monitor_id)
 
         since = _parse_period(period)
-        checks = service.list_checks(
-            monitor_id, since=since, limit=1000, offset=0
-        )
+        checks = service.list_checks(monitor_id, since=since, limit=1000, offset=0)
 
         total = len(checks)
         successes = [c for c in checks if c.status == CheckStatus.SUCCESS.value]
         failures = total - len(successes)
 
-        latencies = [
-            c.response_time_ms
-            for c in successes
-            if c.response_time_ms is not None
-        ]
+        latencies = [c.response_time_ms for c in successes if c.response_time_ms is not None]
         avg_latency = sum(latencies) / len(latencies) if latencies else None
         max_latency = max(latencies) if latencies else None
 
@@ -666,7 +643,7 @@ def _parse_period(period: str) -> datetime:
             detail=f"Unsupported period unit {unit!r}",
         )
 
-    return datetime.now(timezone.utc) - delta
+    return datetime.now(UTC) - delta
 
 
 # ---------------------------------------------------------------------------

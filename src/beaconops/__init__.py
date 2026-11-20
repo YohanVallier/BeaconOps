@@ -14,10 +14,8 @@ The package is organized into the following subpackages:
 
 from __future__ import annotations
 
-__all__ = ["__version__", "__title__", "__description__"]
+__all__ = ["__description__", "__title__", "__version__"]
 
 __title__: str = "BeaconOps"
 __version__: str = "0.1.0"
-__description__: str = (
-    "Self-managed API availability and performance monitoring platform."
-)
+__description__: str = "Self-managed API availability and performance monitoring platform."

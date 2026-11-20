@@ -25,10 +25,10 @@ invoked by the monitor service after each check is persisted.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Optional, Sequence
+from datetime import UTC, datetime
+from enum import StrEnum
 
 from sqlalchemy import (
     Boolean,
@@ -48,7 +48,6 @@ from beaconops.core.monitor import (
     CheckResult,
     CheckStatus,
     Monitor,
-    MonitorCheck,
     MonitorNotFoundError,
 )
 from beaconops.core.notifications import (
@@ -75,14 +74,14 @@ logger: logging.Logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class IncidentStatus(str, Enum):
+class IncidentStatus(StrEnum):
     """Lifecycle status of an incident."""
 
     OPEN = "open"
     CLOSED = "closed"
 
 
-class MonitorStateStatus(str, Enum):
+class MonitorStateStatus(StrEnum):
     """Current availability state of a monitor."""
 
     AVAILABLE = "available"
@@ -111,20 +110,14 @@ class MonitorState(Base):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=MonitorStateStatus.AVAILABLE.value
     )
-    consecutive_failures: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    consecutive_successes: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=0
-    )
-    open_incident_id: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True, default=None
-    )
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    consecutive_successes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    open_incident_id: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
     monitor: Mapped[Monitor] = relationship("Monitor")
@@ -152,39 +145,26 @@ class Incident(Base):
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         index=True,
     )
-    closed_at: Mapped[Optional[datetime]] = mapped_column(
+    closed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    trigger_check_id: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True, default=None
-    )
-    resolution_check_id: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True, default=None
-    )
-    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
-    resolution_reason: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, default=None
-    )
-    notified_open: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
-    notified_closed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
+    trigger_check_id: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    resolution_check_id: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    resolution_reason: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    notified_open: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notified_closed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     monitor: Mapped[Monitor] = relationship("Monitor")
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return (
-            f"<Incident id={self.id} monitor_id={self.monitor_id} "
-            f"status={self.status}>"
-        )
+        return f"<Incident id={self.id} monitor_id={self.monitor_id} status={self.status}>"
 
     @property
-    def duration_seconds(self) -> Optional[float]:
+    def duration_seconds(self) -> float | None:
         """Return the incident duration in seconds, or ``None`` if still open."""
 
         if self.closed_at is None:
@@ -218,7 +198,7 @@ class IncidentEvaluation:
     current_status: MonitorStateStatus
     incident_opened: bool
     incident_closed: bool
-    incident_id: Optional[int]
+    incident_id: int | None
     latency_exceeded: bool
 
 
@@ -252,10 +232,10 @@ class IncidentIdentifier:
 
     def __init__(
         self,
-        settings: Optional[Settings] = None,
+        settings: Settings | None = None,
         *,
-        session_factory: Optional[sessionmaker[Session]] = None,
-        notifier: Optional[Notifier] = None,
+        session_factory: sessionmaker[Session] | None = None,
+        notifier: Notifier | None = None,
     ) -> None:
         """Initialize the identifier.
 
@@ -283,7 +263,7 @@ class IncidentIdentifier:
         monitor: Monitor,
         check: CheckResult,
         *,
-        check_id: Optional[int] = None,
+        check_id: int | None = None,
     ) -> IncidentEvaluation:
         """Evaluate a check result and update incident state accordingly.
 
@@ -301,7 +281,7 @@ class IncidentIdentifier:
             MonitorNotFoundError: If the monitor no longer exists.
         """
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         latency_exceeded = self._is_latency_exceeded(monitor, check)
 
         with self._session_factory() as session:
@@ -310,7 +290,7 @@ class IncidentIdentifier:
 
             incident_opened = False
             incident_closed = False
-            incident_id: Optional[int] = state.open_incident_id
+            incident_id: int | None = state.open_incident_id
 
             if check.status is CheckStatus.SUCCESS:
                 state.consecutive_successes += 1
@@ -391,7 +371,7 @@ class IncidentIdentifier:
         await self._dispatch_notifications(monitor, evaluation, check)
         return evaluation
 
-    def get_state(self, monitor_id: int) -> Optional[MonitorState]:
+    def get_state(self, monitor_id: int) -> MonitorState | None:
         """Return the persisted state for a monitor, if any."""
 
         with self._session_factory() as session:
@@ -400,8 +380,8 @@ class IncidentIdentifier:
     def list_incidents(
         self,
         *,
-        monitor_id: Optional[int] = None,
-        status: Optional[IncidentStatus] = None,
+        monitor_id: int | None = None,
+        status: IncidentStatus | None = None,
         limit: int = 100,
         offset: int = 0,
     ) -> Sequence[Incident]:
@@ -412,12 +392,7 @@ class IncidentIdentifier:
         if offset < 0:
             raise ValueError("offset must be non-negative")
 
-        stmt = (
-            select(Incident)
-            .order_by(Incident.opened_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+        stmt = select(Incident).order_by(Incident.opened_at.desc()).limit(limit).offset(offset)
         if monitor_id is not None:
             stmt = stmt.where(Incident.monitor_id == monitor_id)
         if status is not None:
@@ -439,14 +414,12 @@ class IncidentIdentifier:
                 raise MonitorNotFoundError(f"Incident {incident_id} not found")
             return incident
 
-    def count_open_incidents(self, monitor_id: Optional[int] = None) -> int:
+    def count_open_incidents(self, monitor_id: int | None = None) -> int:
         """Return the number of currently open incidents."""
 
         from sqlalchemy import func
 
-        stmt = select(func.count(Incident.id)).where(
-            Incident.status == IncidentStatus.OPEN.value
-        )
+        stmt = select(func.count(Incident.id)).where(Incident.status == IncidentStatus.OPEN.value)
         if monitor_id is not None:
             stmt = stmt.where(Incident.monitor_id == monitor_id)
 
@@ -479,7 +452,7 @@ class IncidentIdentifier:
         *,
         monitor: Monitor,
         check: CheckResult,
-        check_id: Optional[int],
+        check_id: int | None,
         opened_at: datetime,
     ) -> Incident:
         """Create and persist a new open incident."""
@@ -502,13 +475,13 @@ class IncidentIdentifier:
         session: Session,
         *,
         monitor_id: int,
-        incident_id: Optional[int],
-        check_id: Optional[int],
+        incident_id: int | None,
+        check_id: int | None,
         closed_at: datetime,
-    ) -> Optional[Incident]:
+    ) -> Incident | None:
         """Close the currently open incident for a monitor, if any."""
 
-        incident: Optional[Incident] = None
+        incident: Incident | None = None
         if incident_id is not None:
             incident = session.get(Incident, incident_id)
 
@@ -525,9 +498,7 @@ class IncidentIdentifier:
             incident = session.scalars(stmt).first()
 
         if incident is None:
-            logger.warning(
-                "No open incident found to close for monitor id=%s", monitor_id
-            )
+            logger.warning("No open incident found to close for monitor id=%s", monitor_id)
             return None
 
         incident.status = IncidentStatus.CLOSED.value
@@ -559,7 +530,7 @@ class IncidentIdentifier:
         webhook cannot disrupt monitoring.
         """
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if evaluation.incident_opened:
             event = NotificationEvent(
@@ -613,12 +584,9 @@ class IncidentIdentifier:
 
         try:
             await self._notifier.notify(event)
-        except Exception:  # noqa: BLE001 - notification boundary
+        except Exception:
             logger.exception(
                 "Failed to dispatch notification %s for monitor id=%s",
                 event.event_type.value,
                 event.monitor_id,
             )
-</｜｜DSML｜｜ parameter>
-</｜｜DSML｜｜ invoke>
-</｜｜DSML｜｜ calls>
