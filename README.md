@@ -1,983 +1,209 @@
-# BeaconOps
+<a id="top"></a>
 
-> **Documentação bilíngue \| Bilingual documentation**
+<div align="center">
 
--   [Português (Brasil)](#documentação-em-português)
--   [English](#english-documentation)
+# 🚦 BeaconOps
 
-------------------------------------------------------------------------
+### API Monitoring & Observability Platform · Monitoramento & Observabilidade de APIs
 
-# Documentação em português
+<p>
+  <a href="#english"><kbd>🇺🇸&nbsp; English Version</kbd></a>
+  &nbsp;&nbsp;
+  <a href="#portugues"><kbd>🇧🇷&nbsp; Versão em Português</kbd></a>
+</p>
 
-# BeaconOps
+<a href="https://github.com/YohanVallier/BeaconOps">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=20&duration=3200&pause=1000&color=A855F7&center=true&vCenter=true&width=760&lines=Noise-free+API+observability.+Know+before+your+users+do.;Observabilidade+de+APIs+sem+ru%C3%ADdo.+Saiba+antes+do+seu+usu%C3%A1rio.;FastAPI+%C2%B7+HTTPX+%C2%B7+APScheduler+%C2%B7+SQLAlchemy+%C2%B7+Webhooks" alt="BeaconOps Tagline" />
+</a>
 
-> **Observabilidade de APIs sem ruído. Saiba antes do seu usuário.**
+<p>
+  <code>Python 3.11+</code> · <code>FastAPI</code> · <code>HTTPX</code> · <code>APScheduler</code> · <code>SQLAlchemy</code> · <code>Docker</code> · <code>MIT License</code>
+</p>
 
-BeaconOps é uma plataforma autogerenciada de monitoramento de
-disponibilidade e desempenho de APIs e serviços HTTP. Cadastre
-endpoints, defina critérios de sucesso, execute verificações periódicas
-e receba notificações quando algo sair do esperado --- com histórico
-completo, identificação de incidentes e indicadores operacionais
-confiáveis.
+<p>
+  <img src="https://skillicons.dev/icons?i=python,fastapi,sqlite,postgres,docker,githubactions&theme=dark" alt="BeaconOps Tech Stack" />
+</p>
 
-------------------------------------------------------------------------
+</div>
 
-## Sumário
+---
 
--   [Problema resolvido](#problema-resolvido)
--   [Público-alvo](#público-alvo)
--   [Funcionalidades](#funcionalidades)
--   [Tecnologias](#tecnologias)
--   [Arquitetura](#arquitetura)
--   [Fluxo de monitoramento](#fluxo-de-monitoramento)
--   [Estrutura de diretórios](#estrutura-de-diretórios)
--   [Pré-requisitos](#pré-requisitos)
--   [Instalação](#instalação)
--   [Configuração](#configuração)
--   [Variáveis de ambiente](#variáveis-de-ambiente)
--   [Inicialização](#inicialização)
--   [Endpoints da API](#endpoints-da-api)
--   [Exemplos de utilização](#exemplos-de-utilização)
--   [Testes](#testes)
--   [Segurança](#segurança)
--   [Limitações](#limitações)
--   [Roadmap](#roadmap)
--   [Licença](#licença)
+<a id="english"></a>
 
-------------------------------------------------------------------------
+<div align="center">
 
-## Problema resolvido
-
-Equipes técnicas dependem de APIs internas e externas para manter suas
-aplicações funcionando. Falhas de disponibilidade, lentidão, códigos
-HTTP inesperados e respostas fora do contrato podem comprometer
-operações --- e, sem monitoramento adequado, só são percebidas quando o
-usuário final já foi afetado.
-
-O BeaconOps centraliza o monitoramento desses serviços em uma única
-aplicação, permitindo:
-
--   Detectar APIs indisponíveis e endpoints com respostas HTTP
-    inesperadas.
--   Identificar aumento de latência e falhas consecutivas.
--   Detectar alterações no comportamento esperado (validação de
-    conteúdo).
--   Registrar interrupções temporárias e recuperações.
--   Notificar responsáveis por Webhook quando incidentes forem abertos
-    ou encerrados.
-
-O produto foi projetado para ser **autogerenciado**: você executa,
-controla e evolui a plataforma sem depender de serviços comerciais
-externos.
-
-------------------------------------------------------------------------
-
-## Público-alvo
-
--   Desenvolvedores backend e engenheiros de software.
--   Administradores de sistemas e equipes de infraestrutura/operações.
--   Pequenas empresas e equipes de tecnologia.
--   Profissionais responsáveis por APIs e integrações.
-
-------------------------------------------------------------------------
-
-## Funcionalidades
-
-### Gerenciamento de monitores
-
--   Cadastro, consulta, atualização, ativação/desativação e remoção de
-    endpoints monitorados.
--   Cada monitor possui: identificador, nome, URL, método HTTP,
-    intervalo de verificação, timeout, status HTTP esperado, limite de
-    latência, critério opcional de validação da resposta, estado de
-    ativação e data de criação.
--   Validação rigorosa de configurações --- configurações inválidas são
-    rejeitadas.
-
-### Monitoramento automático
-
--   Execução periódica dos monitores ativos via APScheduler.
--   Verificações concorrentes com limite configurável
-    (`BEACONOPS_MAX_CONCURRENT_CHECKS`).
--   Tratamento de timeouts, falhas de conexão, erros HTTP e respostas
-    inesperadas.
--   Cancelamento seguro de operações e timeouts obrigatórios.
-
-### Registro das verificações
-
--   Cada execução gera um registro histórico com: monitor associado,
-    data/hora, resultado, código HTTP, tempo de resposta, mensagem de
-    erro (quando aplicável) e informações de diagnóstico.
--   Diferenciação explícita entre verificações bem-sucedidas e
-    malsucedidas.
-
-### Identificação de incidentes
-
--   Detecção de indisponibilidade por **falhas consecutivas** com limiar
-    configurável (`BEACONOPS_FAILURE_THRESHOLD`).
--   Transição de disponível → indisponível abre um incidente.
--   Transição de indisponível → disponível encerra o incidente
-    (recuperação), com limiar configurável
-    (`BEACONOPS_RECOVERY_THRESHOLD`).
--   Não abre um novo incidente para cada verificação malsucedida de um
-    serviço já indisponível.
-
-### Notificações
-
--   Notificações por **Webhook HTTP** para eventos relevantes:
-    -   Serviço indisponível.
-    -   Serviço recuperado.
-    -   Latência acima do limite.
-    -   Alteração relevante no estado do monitor.
--   Deduplicação de notificações e registro de falhas de entrega.
--   Nenhuma credencial ou informação sensível é enviada
-    desnecessariamente.
-
-### Histórico e consulta
-
--   Histórico de verificações com filtros e paginação.
--   Estado atual dos monitores.
--   Incidentes (ativos e encerrados).
--   Tempo médio de resposta, taxa de disponibilidade, ocorrências de
-    falhas e períodos de indisponibilidade.
-
-### Indicadores operacionais
-
--   **Uptime**: proporção de verificações bem-sucedidas no período de
-    referência.
--   **Downtime**: proporção de verificações malsucedidas no período.
--   **Latência média** e **latência máxima** das verificações
-    bem-sucedidas.
--   **Quantidade de verificações** e **quantidade de falhas** no
-    período.
--   **Incidentes ativos** no momento da consulta.
--   **Tempo de recuperação**: intervalo entre a abertura e o
-    encerramento de cada incidente.
-
-Todas as métricas são calculadas a partir de dados persistidos ---
-nenhum valor é inventado ou estimado.
-
-------------------------------------------------------------------------
-
-## Tecnologias
-
-  ---------------------------------------------------------------------------
-  Camada                  Tecnologia              Responsabilidade
-  ----------------------- ----------------------- ---------------------------
-  Backend                 **FastAPI**             API REST, validação,
-                                                  OpenAPI automático.
-
-  Servidor                **Uvicorn**             Servidor ASGI de
-                                                  produção/desenvolvimento.
-
-  Validação               **Pydantic**            Contratos de entrada/saída
-                                                  e configuração.
-
-  HTTP                    **HTTPX**               Requisições assíncronas com
-                                                  timeouts e limites.
-
-  Persistência            **SQLAlchemy**          ORM e abstração de banco
-                                                  (SQLite/PostgreSQL).
-
-  Agendamento             **APScheduler**         Execução periódica
-                                                  desacoplada da API.
-
-  Testes                  **Pytest**,             Testes unitários/integração
-                          **pytest-cov**          e cobertura.
-
-  Qualidade               **Ruff**, **MyPy**      Lint e verificação de
-                                                  tipos.
-
-  Infra                   **Docker**, **Docker    Empacotamento e execução
-                          Compose**               reproduzível.
-
-  CI                      **GitHub Actions**      Execução automatizada de
-                                                  testes.
-  ---------------------------------------------------------------------------
-
-Dependências deliberadamente **não** incluídas: Redis, Celery, Kafka e
-microsserviços --- não há justificativa operacional concreta para o MVP.
-
-------------------------------------------------------------------------
-
-## Arquitetura
-
-O BeaconOps segue uma arquitetura modular com separação clara de
-responsabilidades:
-
--   **API** (`api/`): rotas FastAPI, modelos Pydantic, tratamento de
-    erros.
--   **Domínio / Core** (`core/`): regras de negócio --- monitores,
-    agendamento, notificações.
--   **Serviços** (`services/`): integrações e casos de uso --- cliente
-    HTTP, identificação de incidentes.
--   **Utilitários** (`utils/`): validações (URL, resposta HTTP) e
-    logging.
--   **Configuração** (`config/`): settings centralizados via variáveis
-    de ambiente.
-
-O mecanismo de agendamento é desacoplado da lógica de negócio: as
-operações de monitoramento não dependem das rotas HTTP e podem ser
-executadas pelo scheduler, por testes ou por chamadas manuais.
-
-``` mermaid
-flowchart LR
-    subgraph API["API (FastAPI)"]
-        R[routes.py]
-        M[pydantic_models.py]
-    end
-
-    subgraph Core["Core"]
-        MON[monitor.py]
-        SCH[schedule.py]
-        NOT[notifications.py]
-    end
-
-    subgraph Services["Services"]
-        HC[http_client.py]
-        INC[incident_identification.py]
-    end
-
-    subgraph Utils["Utils"]
-        VAL[validations.py]
-        LOG[logging.py]
-    end
-
-    subgraph Config["Config"]
-        SET[settings.py]
-    end
-
-    subgraph Persistence["Persistência"]
-        DB[(SQLAlchemy / SQLite / PostgreSQL)]
-    end
-
-    R --> MON
-    R --> INC
-    M --> R
-    SCH --> MON
-    MON --> HC
-    MON --> INC
-    MON --> DB
-    INC --> DB
-    INC --> NOT
-    NOT --> HC
-    HC --> VAL
-    MON --> VAL
-    R --> SET
-    SCH --> SET
-    HC --> SET
-    NOT --> SET
-    MON --> LOG
-    HC --> LOG
-    NOT --> LOG
-```
-
-------------------------------------------------------------------------
-
-## Fluxo de monitoramento
-
-``` mermaid
-sequenceDiagram
-    autonumber
-    participant S as Scheduler (APScheduler)
-    participant M as MonitorService
-    participant V as Validations (SSRF)
-    participant H as HTTPClient (HTTPX)
-    participant I as IncidentIdentifier
-    participant N as Notifier (Webhook)
-    participant D as Database
-
-    S->>M: dispara verificação (monitor_id)
-    M->>D: carrega configuração do monitor
-    M->>V: valida URL e destino (SSRF)
-    alt URL inválida / destino proibido
-        V-->>M: erro de validação
-        M->>D: persiste verificação (falha)
-    else URL válida
-        M->>H: executa requisição (timeout, limite)
-        H-->>M: resultado (status, latência, corpo)
-        M->>D: persiste verificação
-        M->>I: avalia resultado
-        I->>D: atualiza estado do monitor
-        alt transição disponível → indisponível
-            I->>N: notifica "serviço indisponível"
-        else transição indisponível → disponível
-            I->>N: notifica "serviço recuperado"
-        else latência acima do limite
-            I->>N: notifica "latência alta"
-        end
-        N->>D: registra entrega (sucesso/falha)
-    end
-```
-
-------------------------------------------------------------------------
-
-## Estrutura de diretórios
-
-    beaconops/
-    ├── .github/
-    │   └── workflows/
-    │       └── tests.yml
-    ├── src/
-    │   └── beaconops/
-    │       ├── __init__.py
-    │       ├── api/
-    │       │   ├── __init__.py
-    │       │   ├── routes.py
-    │       │   └── pydantic_models.py
-    │       ├── config/
-    │       │   └── settings.py
-    │       ├── core/
-    │       │   ├── __init__.py
-    │       │   ├── monitor.py
-    │       │   ├── schedule.py
-    │       │   └── notifications.py
-    │       ├── services/
-    │       │   ├── __init__.py
-    │       │   ├── http_client.py
-    │       │   └── incident_identification.py
-    │       └── utils/
-    │           ├── __init__.py
-    │           ├── validations.py
-    │           └── logging.py
-    ├── tests/
-    │   ├── conftest.py
-    │   └── test_main.py
-    ├── .env.example
-    ├── .gitignore
-    ├── CHANGELOG.md
-    ├── Dockerfile
-    ├── docker-compose.yml
-    ├── LICENSE
-    ├── pyproject.toml
-    ├── README.md
-    └── requirements.txt
-
-------------------------------------------------------------------------
-
-## Pré-requisitos
-
--   **Python 3.11+** (testado em 3.11 e 3.12).
--   **pip** atualizado.
--   **Docker** e **Docker Compose** (opcional, para execução
-    containerizada).
--   Nenhum serviço externo é obrigatório para o MVP --- SQLite é o
-    padrão.
-
-------------------------------------------------------------------------
-
-## Instalação
-
-### Local (recomendado para desenvolvimento)
-
-``` bash
-# 1. Clone o repositório
-git clone https://github.com/<seu-usuario>/beaconops.git
-cd beaconops
-
-# 2. Crie e ative um ambiente virtual
-python -m venv .venv
-source .venv/bin/activate   # Linux/macOS
-# .venv\Scripts\activate    # Windows
-
-# 3. Instale as dependências
-pip install --upgrade pip
-pip install -r requirements.txt
-pip install -e .
-
-# 4. Configure o ambiente
-cp .env.example .env
-# Edite .env conforme necessário (veja a seção de variáveis)
-```
-
-### Docker
-
-``` bash
-docker compose build
-docker compose up -d
-```
-
-------------------------------------------------------------------------
-
-## Configuração
-
-Toda a configuração é centralizada em `src/beaconops/config/settings.py`
-e lida a partir de variáveis de ambiente (com suporte a arquivo `.env`).
-Nenhum segredo é hardcoded.
-
-Pontos de atenção:
-
--   **`BEACONOPS_ADMIN_API_KEY`** deve ser gerada com um valor forte e
-    aleatório:
-
-    ``` bash
-    python -c "import secrets; print(secrets.token_urlsafe(32))"
-    ```
-
--   **`BEACONOPS_ALLOW_PRIVATE_TARGETS`** deve permanecer `false` em
-    produção, salvo se você compreender plenamente o risco de SSRF.
-
--   **`BEACONOPS_DATABASE_URL`** permite alternar entre SQLite (padrão)
-    e PostgreSQL.
-
-------------------------------------------------------------------------
-
-## Variáveis de ambiente
-
-  -------------------------------------------------------------------------------------------------
-  Variável                                     Padrão                       Descrição
-  -------------------------------------------- ---------------------------- -----------------------
-  `BEACONOPS_ENV`                              `development`                Ambiente:
-                                                                            `development`, `test`,
-                                                                            `production`.
-
-  `BEACONOPS_LOG_LEVEL`                        `INFO`                       Nível de log (`DEBUG`,
-                                                                            `INFO`, `WARNING`,
-                                                                            `ERROR`, `CRITICAL`).
-
-  `BEACONOPS_DATABASE_URL`                     `sqlite:///./beaconops.db`   URL SQLAlchemy do
-                                                                            banco.
-
-  `BEACONOPS_HTTP_TIMEOUT_SECONDS`             `10`                         Timeout padrão das
-                                                                            requisições de
-                                                                            monitoramento.
-
-  `BEACONOPS_HTTP_MAX_RESPONSE_BYTES`          `1048576`                    Tamanho máximo do corpo
-                                                                            lido.
-
-  `BEACONOPS_MAX_CONCURRENT_CHECKS`            `10`                         Concorrência máxima de
-                                                                            verificações.
-
-  `BEACONOPS_SCHEDULER_ENABLED`                `true`                       Habilita o scheduler em
-                                                                            background.
-
-  `BEACONOPS_DEFAULT_CHECK_INTERVAL_SECONDS`   `60`                         Intervalo padrão entre
-                                                                            verificações.
-
-  `BEACONOPS_FAILURE_THRESHOLD`                `3`                          Falhas consecutivas
-                                                                            para abrir incidente.
-
-  `BEACONOPS_RECOVERY_THRESHOLD`               `2`                          Sucessos consecutivos
-                                                                            para encerrar
-                                                                            incidente.
-
-  `BEACONOPS_NOTIFICATIONS_ENABLED`            `true`                       Habilita notificações
-                                                                            por Webhook.
-
-  `BEACONOPS_DEFAULT_WEBHOOK_URL`              *(vazio)*                    Webhook padrão quando o
-                                                                            monitor não define um.
-
-  `BEACONOPS_WEBHOOK_TIMEOUT_SECONDS`          `5`                          Timeout de entrega de
-                                                                            Webhook.
-
-  `BEACONOPS_ALLOW_PRIVATE_TARGETS`            `false`                      Permite alvos
-                                                                            privados/loopback
-                                                                            (risco de SSRF).
-
-  `BEACONOPS_ALLOWED_HOSTS`                    *(vazio)*                    Hostnames adicionais
-                                                                            explicitamente
-                                                                            permitidos.
-
-  `BEACONOPS_ALLOWED_PORTS`                    `80,443`                     Portas permitidas para
-                                                                            endpoints monitorados.
-
-  `BEACONOPS_MAX_REDIRECTS`                    `3`                          Máximo de
-                                                                            redirecionamentos
-                                                                            seguidos.
-
-  `BEACONOPS_ADMIN_API_KEY`                    *(vazio)*                    Chave de API para
-                                                                            endpoints
-                                                                            administrativos.
-
-  `BEACONOPS_HOST`                             `0.0.0.0`                    Host do servidor
-                                                                            Uvicorn.
-
-  `BEACONOPS_PORT`                             `8000`                       Porta do servidor
-                                                                            Uvicorn.
-
-  `BEACONOPS_RELOAD`                           `false`                      Habilita auto-reload
-                                                                            (apenas
-                                                                            desenvolvimento).
-  -------------------------------------------------------------------------------------------------
-
-------------------------------------------------------------------------
-
-## Inicialização
-
-### Local
-
-``` bash
-# Aplicação (API + scheduler)
-uvicorn beaconops.api.routes:app --host 0.0.0.0 --port 8000
-```
-
-A documentação OpenAPI estará disponível em:
-
--   Swagger UI: `http://localhost:8000/docs`
--   ReDoc: `http://localhost:8000/redoc`
--   OpenAPI JSON: `http://localhost:8000/openapi.json`
-
-### Docker Compose
-
-``` bash
-docker compose up -d
-docker compose logs -f beaconops
-```
-
-------------------------------------------------------------------------
-
-## Endpoints da API
-
-> Todos os endpoints administrativos exigem o header `X-API-Key` com o
-> valor de `BEACONOPS_ADMIN_API_KEY`.
-
-### Saúde
-
-  Método   Rota        Descrição
-  -------- ----------- ------------------------------------
-  `GET`    `/health`   Verificação de saúde da aplicação.
-
-### Monitores
-
-  Método     Rota                     Descrição
-  ---------- ------------------------ ----------------------------------------
-  `POST`     `/monitors`              Cria um monitor.
-  `GET`      `/monitors`              Lista monitores (filtros e paginação).
-  `GET`      `/monitors/{id}`         Consulta um monitor.
-  `PATCH`    `/monitors/{id}`         Atualiza um monitor.
-  `DELETE`   `/monitors/{id}`         Remove um monitor.
-  `POST`     `/monitors/{id}/check`   Executa verificação manual.
-
-### Verificações
-
-  -------------------------------------------------------------------------
-  Método                  Rota                      Descrição
-  ----------------------- ------------------------- -----------------------
-  `GET`                   `/monitors/{id}/checks`   Histórico de
-                                                    verificações (filtros e
-                                                    paginação).
-
-  -------------------------------------------------------------------------
-
-### Incidentes
-
-  Método   Rota                Descrição
-  -------- ------------------- -----------------------------------------
-  `GET`    `/incidents`        Lista incidentes (filtros e paginação).
-  `GET`    `/incidents/{id}`   Consulta um incidente.
-
-### Indicadores
-
-  --------------------------------------------------------------------------
-  Método                  Rota                       Descrição
-  ----------------------- -------------------------- -----------------------
-  `GET`                   `/monitors/{id}/metrics`   Indicadores
-                                                     operacionais do
-                                                     monitor.
-
-  --------------------------------------------------------------------------
-
-### Códigos de status
-
--   `200 OK` --- sucesso.
--   `201 Created` --- recurso criado.
--   `204 No Content` --- recurso removido.
--   `400 Bad Request` --- payload inválido.
--   `401 Unauthorized` --- chave de API ausente ou inválida.
--   `404 Not Found` --- recurso inexistente.
--   `422 Unprocessable Entity` --- falha de validação (Pydantic).
--   `500 Internal Server Error` --- erro inesperado.
-
-------------------------------------------------------------------------
-
-## Exemplos de utilização
-
-### Criar um monitor
-
-``` bash
-curl -X POST http://localhost:8000/monitors \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY" \
-  -d '{
-    "name": "API pública de exemplo",
-    "url": "https://api.exemplo.com/health",
-    "method": "GET",
-    "interval_seconds": 60,
-    "timeout_seconds": 5,
-    "expected_status": 200,
-    "latency_threshold_ms": 800,
-    "active": true
-  }'
-```
-
-### Executar verificação manual
-
-``` bash
-curl -X POST http://localhost:8000/monitors/1/check \
-  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
-```
-
-### Consultar histórico de verificações
-
-``` bash
-curl "http://localhost:8000/monitors/1/checks?limit=20&offset=0" \
-  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
-```
-
-### Consultar indicadores
-
-``` bash
-curl "http://localhost:8000/monitors/1/metrics?period=24h" \
-  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
-```
-
-### Consultar incidentes ativos
-
-``` bash
-curl "http://localhost:8000/incidents?status=open" \
-  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
-```
-
-------------------------------------------------------------------------
-
-## Testes
-
-``` bash
-# Executar toda a suíte
-pytest -v
-
-# Com cobertura
-pytest --cov=beaconops --cov-report=term-missing
-
-# Lint
-ruff check src tests
-
-# Verificação de tipos
-mypy src
-```
-
-Os testes cobrem:
-
--   Cadastro e validação de monitores.
--   Validação de URLs e proteção contra SSRF.
--   Respostas HTTP bem-sucedidas e inválidas.
--   Timeouts e falhas de conexão.
--   Execução periódica e falhas consecutivas.
--   Criação e encerramento de incidentes.
--   Deduplicação de notificações e falhas de Webhook.
--   Persistência e consultas históricas.
--   Cálculo de indicadores.
-
-Os testes **não dependem de serviços externos ou credenciais reais** ---
-utilizam mocks e servidores HTTP locais.
-
-A CI (`.github/workflows/tests.yml`) executa lint, verificação de tipos
-e testes com cobertura em Python 3.11 e 3.12 a cada push e pull request.
-
-------------------------------------------------------------------------
-
-## Segurança
-
-O BeaconOps realiza requisições HTTP para endereços configurados pelos
-usuários. A proteção contra **Server-Side Request Forgery (SSRF)** é uma
-preocupação central:
-
--   **Validação rigorosa de URLs**: apenas `http` e `https` são aceitos.
--   **Bloqueio de destinos locais, privados, reservados e link-local**
-    por padrão (`BEACONOPS_ALLOW_PRIVATE_TARGETS=false`).
--   **Validação dos IPs resolvidos** --- não apenas do texto da URL.
--   **Proteção contra redirecionamentos** para destinos proibidos.
--   **Restrição de portas** via `BEACONOPS_ALLOWED_PORTS`.
--   **Timeouts obrigatórios** e **limite de tamanho de resposta**.
--   **Proteção de credenciais**: nenhuma credencial é enviada em
-    notificações.
--   **Validação de Webhooks** com as mesmas regras de SSRF.
--   **Controle de acesso** aos endpoints administrativos via
-    `X-API-Key`.
-
-### Limitações da estratégia de segurança
-
-A validação textual de uma URL **não é suficiente** para impedir SSRF. O
-BeaconOps mitiga riscos considerando resolução DNS, redirecionamentos e
-destinos internos, mas **não oferece proteção absoluta**. Cenários como
-DNS rebinding, proxies intermediários maliciosos ou configurações
-administrativas permissivas podem contornar as defesas. Recomenda-se:
-
--   Manter `BEACONOPS_ALLOW_PRIVATE_TARGETS=false` em produção.
--   Restringir `BEACONOPS_ALLOWED_PORTS` ao mínimo necessário.
--   Executar o serviço em rede isolada quando possível.
--   Auditar periodicamente os monitores cadastrados.
-
-------------------------------------------------------------------------
-
-## Limitações
-
--   **Sem autenticação multiusuário** no MVP --- apenas chave de API
-    administrativa.
--   **Sem painel frontend** --- a interface é a API REST documentada.
--   **SQLite** é o padrão; PostgreSQL é suportado via
-    `BEACONOPS_DATABASE_URL`, mas o MVP foi validado primariamente em
-    SQLite.
--   **Notificações apenas por Webhook HTTP** --- outros canais estão no
-    roadmap.
--   **Scheduler em processo único** --- não há processamento distribuído
-    no MVP.
--   **Sem monitoramento de certificados TLS ou DNS** --- previsto no
-    roadmap.
--   **Métricas calculadas a partir de dados persistidos** --- não há
-    estimativas ou projeções.
-
-------------------------------------------------------------------------
-
-## Roadmap
-
-### Prioridade alta
-
--   Painel web com gráficos históricos.
--   Autenticação e gerenciamento de usuários.
--   Canais adicionais de notificação (e-mail, Slack, Telegram).
--   Relatórios periódicos.
-
-### Prioridade média
-
--   Monitoramento de certificados TLS e DNS.
--   Agrupamento de monitores.
--   Políticas de escalonamento de incidentes.
--   Métricas mais avançadas (percentis de latência, SLOs).
-
-### Prioridade baixa
-
--   Suporte ampliado e otimizado a PostgreSQL.
--   Processamento distribuído (somente com justificativa operacional
-    concreta).
-
-> Funcionalidades listadas no roadmap **não estão implementadas** no
-> MVP.
-
-------------------------------------------------------------------------
-
-## Licença
-
-Distribuído sob a licença **MIT**. Consulte o arquivo [LICENSE](LICENSE)
-para os termos completos.
-
-------------------------------------------------------------------------
-
-**BeaconOps** --- *Observabilidade de APIs sem ruído. Saiba antes do seu
-usuário.*
-
-------------------------------------------------------------------------
-
-# English documentation
-
-# BeaconOps
+## 🇺🇸 English Documentation
 
 > **Noise-free API observability. Know before your users do.**
 
-BeaconOps is a self-hosted platform for monitoring the availability and
-performance of APIs and HTTP services. Register endpoints, define
-success criteria, run periodic checks, and receive notifications when
-something goes wrong --- with a complete history, incident detection,
-and reliable operational metrics.
+**BeaconOps** is a self-hosted platform for monitoring the availability and performance of APIs and HTTP services. Register endpoints, define success criteria, run scheduled asynchronous checks, and receive Webhook notifications when something goes wrong — with full history, automatic incident detection, and reliable operational metrics.
 
-------------------------------------------------------------------------
+<p>
+  <a href="#en-problem"><kbd>Problem</kbd></a>
+  <a href="#en-features"><kbd>Features</kbd></a>
+  <a href="#en-stack"><kbd>Stack</kbd></a>
+  <a href="#en-architecture"><kbd>Architecture</kbd></a>
+  <a href="#en-quickstart"><kbd>Quick Start</kbd></a>
+  <a href="#en-api"><kbd>API</kbd></a>
+  <a href="#en-security"><kbd>Security</kbd></a>
+  <a href="#en-roadmap"><kbd>Roadmap</kbd></a>
+</p>
 
-## Table of Contents
+</div>
 
--   [Problem Solved](#problema-resolvido)
--   [Target Audience](#público-alvo)
--   [Features](#funcionalidades)
--   [Technology Stack](#tecnologias)
--   [Architecture](#arquitetura)
--   [Monitoring Workflow](#fluxo-de-monitoramento)
--   [Directory Structure](#estrutura-de-diretórios)
--   [Prerequisites](#pré-requisitos)
--   [Installation](#instalação)
--   [Configuration](#configuração)
--   [Environment Variables](#variáveis-de-ambiente)
--   [Getting Started](#inicialização)
--   [API Endpoints](#endpoints-da-api)
--   [Usage Examples](#exemplos-de-utilização)
--   [Tests](#testes)
--   [Security](#segurança)
--   [Limitations](#limitações)
--   [Roadmap](#roadmap)
--   [License](#licença)
+---
 
-------------------------------------------------------------------------
+<a id="en-problem"></a>
 
-## Problem Solved
+### 🎯 Problem Solved & Target Audience
 
-Technical teams rely on internal and external APIs to keep their
-applications running. Availability failures, slow responses, unexpected
-HTTP status codes, and responses that violate the expected contract can
-disrupt operations --- and without proper monitoring, these issues may
-only be noticed after end users are affected.
+Technical teams rely on internal and external APIs to keep their applications running. Availability failures, latency spikes, unexpected HTTP status codes, and contract-breaking responses can disrupt operations — and without proper monitoring, these issues are often only noticed after end users are already affected.
 
-BeaconOps centralizes service monitoring in a single application, making
-it possible to:
+<table>
+  <tr>
+    <td width="55%" valign="top">
+      <h4>🔍 What BeaconOps Solves</h4>
+      <ul>
+        <li>Detects unavailable APIs and unexpected HTTP status codes.</li>
+        <li>Identifies latency spikes and consecutive failures early.</li>
+        <li>Detects behavioral changes through optional response-content validation.</li>
+        <li>Records temporary outages, recoveries, and full check history.</li>
+        <li>Notifies owners via HTTP Webhooks when incidents open or close.</li>
+      </ul>
+      <p><em>Designed to be <strong>self-hosted</strong>: run, control, and evolve the platform without relying on external commercial tools.</em></p>
+    </td>
+    <td width="45%" valign="top">
+      <h4>👥 Target Audience</h4>
+      <ul>
+        <li>Backend developers and software engineers.</li>
+        <li>System administrators and DevOps / SRE teams.</li>
+        <li>Small businesses and product engineering teams.</li>
+        <li>Professionals maintaining critical APIs and integrations.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
--   Detect unavailable APIs and endpoints returning unexpected HTTP
-    responses.
--   Identify increased latency and consecutive failures.
--   Detect changes in expected behavior through response-content
-    validation.
--   Record temporary outages and recoveries.
--   Notify responsible parties through Webhooks when incidents are
-    opened or resolved.
+---
 
-The product is designed to be **self-hosted**: you run, control, and
-evolve the platform without depending on external commercial services.
+<a id="en-features"></a>
 
-------------------------------------------------------------------------
+### ✨ Key Features
 
-## Target Audience
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>📡 Monitor Management</h4>
+      <ul>
+        <li>Create, read, update, enable/disable, and delete monitored endpoints.</li>
+        <li>Configurable ID, name, URL, HTTP method, interval, timeout, expected status, latency threshold, optional content validation, active flag, and timestamp.</li>
+        <li>Strict configuration validation — invalid payloads are rejected immediately.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>⏱️ Automated Monitoring</h4>
+      <ul>
+        <li>Periodic execution of active monitors via <strong>APScheduler</strong>.</li>
+        <li>Concurrent checks capped by <code>BEACONOPS_MAX_CONCURRENT_CHECKS</code>.</li>
+        <li>Graceful handling of timeouts, connection failures, HTTP errors, and invalid responses.</li>
+        <li>Safe operation cancellation and mandatory timeouts.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🚨 Incident Detection</h4>
+      <ul>
+        <li>Detects outages via <strong>consecutive failures</strong> (<code>BEACONOPS_FAILURE_THRESHOLD</code>).</li>
+        <li><code>available → unavailable</code> opens an incident automatically.</li>
+        <li><code>unavailable → available</code> closes the incident via <code>BEACONOPS_RECOVERY_THRESHOLD</code>.</li>
+        <li>Prevents alert storms by not creating duplicate incidents while a service remains down.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>🔔 Webhook Notifications</h4>
+      <ul>
+        <li>HTTP Webhooks for <strong>service down</strong>, <strong>service recovered</strong>, <strong>high latency</strong>, and relevant monitor state changes.</li>
+        <li>Built-in notification deduplication and delivery failure logging.</li>
+        <li>Zero unnecessary credentials or sensitive data leaked in webhook payloads.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🗂️ Check Records & History</h4>
+      <ul>
+        <li>Persists every check with monitor ID, timestamp, outcome, HTTP status code, latency, error message, and diagnostics.</li>
+        <li>Explicit distinction between successful and failed checks.</li>
+        <li>Filterable and paginated queries for checks, monitor states, and open/closed incidents.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>📊 Operational Metrics</h4>
+      <ul>
+        <li><strong>Uptime & Downtime:</strong> exact ratios over the queried period.</li>
+        <li><strong>Average & Max Latency</strong> for successful checks.</li>
+        <li><strong>Total Checks, Failures & Active Incidents.</strong></li>
+        <li><strong>Recovery Time:</strong> duration between incident opening and resolution.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
--   Backend developers and software engineers.
--   System administrators and infrastructure/operations teams.
--   Small businesses and technology teams.
--   Professionals responsible for APIs and integrations.
+> [!NOTE]
+> All operational metrics are computed strictly from persisted historical data — no values are fabricated or estimated.
 
-------------------------------------------------------------------------
+#### 🔄 Incident Lifecycle
 
-## Features
+```mermaid
+stateDiagram-v2
+    [*] --> Healthy: Monitor created & active
+    Healthy --> Degraded: Check fails (count < FAILURE_THRESHOLD)
+    Degraded --> Healthy: Check succeeds (counter reset)
+    Degraded --> IncidentOpen: Consecutive failures >= FAILURE_THRESHOLD
+    IncidentOpen --> IncidentOpen: Subsequent failures (no duplicate incident)
+    IncidentOpen --> Recovering: Check succeeds (count < RECOVERY_THRESHOLD)
+    Recovering --> IncidentOpen: Check fails again (counter reset)
+    Recovering --> Healthy: Consecutive successes >= RECOVERY_THRESHOLD (Incident Closed)
+```
 
-### Monitor Management
+---
 
--   Create, view, update, enable/disable, and remove monitored
-    endpoints.
--   Each monitor includes: an ID, name, URL, HTTP method, check
-    interval, timeout, expected HTTP status, latency threshold, optional
-    response-validation criteria, enabled state, and creation date.
--   Strict configuration validation --- invalid configurations are
-    rejected.
+<a id="en-stack"></a>
 
-### Automated Monitoring
+### 🧰 Technology Stack
 
--   Periodic execution of active monitors using APScheduler.
--   Concurrent checks with a configurable limit
-    (`BEACONOPS_MAX_CONCURRENT_CHECKS`).
--   Handling of timeouts, connection failures, HTTP errors, and
-    unexpected responses.
--   Safe operation cancellation and mandatory timeouts.
+| Layer | Technology | Responsibility |
+|---|---|---|
+| **Backend** | `FastAPI` | REST API, validation, and automatic OpenAPI docs. |
+| **Server** | `Uvicorn` | ASGI server for development and production. |
+| **Validation** | `Pydantic` | Input/output contracts and settings management. |
+| **HTTP Client** | `HTTPX` | Asynchronous HTTP requests with strict timeouts and size limits. |
+| **Persistence** | `SQLAlchemy` | ORM and database abstraction (`SQLite` default / `PostgreSQL` supported). |
+| **Scheduling** | `APScheduler` | Periodic check execution decoupled from HTTP routes. |
+| **Testing** | `Pytest` · `pytest-cov` | Unit/integration test suite and code coverage. |
+| **Code Quality** | `Ruff` · `MyPy` | Linting and static type checking. |
+| **Infrastructure** | `Docker` · `Docker Compose` | Reproducible container packaging and execution. |
+| **CI** | `GitHub Actions` | Automated linting, type checking, and tests on Python 3.11 & 3.12. |
 
-### Check Records
+> [!TIP]
+> **Deliberately excluded dependencies:** Redis, Celery, Kafka, and microservices — there is no concrete operational justification for adding that complexity to the MVP.
 
--   Each execution creates a historical record containing: the
-    associated monitor, date/time, result, HTTP status code, response
-    time, error message (when applicable), and diagnostic information.
--   Explicit distinction between successful and failed checks.
+---
 
-### Incident Detection
+<a id="en-architecture"></a>
 
--   Unavailability detection based on **consecutive failures**, using a
-    configurable threshold (`BEACONOPS_FAILURE_THRESHOLD`).
--   A transition from available → unavailable opens an incident.
--   A transition from unavailable → available closes the incident
-    (recovery), using a configurable threshold
-    (`BEACONOPS_RECOVERY_THRESHOLD`).
--   A new incident is not opened for every failed check while a service
-    is already unavailable.
+### 🏗️ Architecture & Monitoring Workflow
 
-### Notifications
+BeaconOps follows a clean modular architecture with decoupled scheduling — monitoring operations do not depend on HTTP routes and can be triggered by the background scheduler, tests, or manual API calls:
 
--   Notifications through **HTTP Webhooks** for relevant events:
-    -   Service unavailable.
-    -   Service recovered.
-    -   Latency above the threshold.
-    -   A relevant change in monitor state.
--   Notification deduplication and delivery-failure logging.
--   No credentials or sensitive information are sent unnecessarily.
+- **`api/`**: FastAPI routes, Pydantic models, and error handling.
+- **`core/`**: domain business logic — monitors, scheduling, and notifications.
+- **`services/`**: integrations and use cases — async HTTP client and incident identification.
+- **`utils/`**: security validations (URL, SSRF, HTTP responses) and structured logging.
+- **`config/`**: centralized environment-based settings.
 
-### History and Queries
-
--   Check history with filtering and pagination.
--   Current monitor status.
--   Incidents (open and resolved).
--   Average response time, availability rate, failure occurrences, and
-    downtime periods.
-
-### Operational Metrics
-
--   **Uptime**: proportion of successful checks during the reference
-    period.
--   **Downtime**: proportion of failed checks during the period.
--   **Average latency** and **maximum latency** of successful checks.
--   **Number of checks** and **number of failures** during the period.
--   **Active incidents** at the time of the query.
--   **Recovery time**: time elapsed between the opening and closing of
-    each incident.
-
-All metrics are calculated from persisted data --- no values are
-fabricated or estimated.
-
-------------------------------------------------------------------------
-
-## Technology Stack
-
-  -------------------------------------------------------------------------
-  Layer                   Technology              Responsibility
-  ----------------------- ----------------------- -------------------------
-  Backend                 **FastAPI**             REST API, validation,
-                                                  automatic OpenAPI
-                                                  documentation.
-
-  Server                  **Uvicorn**             ASGI server for
-                                                  production/development.
-
-  Validation              **Pydantic**            Input/output contracts
-                                                  and configuration.
-
-  HTTP                    **HTTPX**               Asynchronous requests
-                                                  with timeouts and limits.
-
-  Persistence             **SQLAlchemy**          ORM and database
-                                                  abstraction
-                                                  (SQLite/PostgreSQL).
-
-  Scheduling              **APScheduler**         Periodic execution
-                                                  decoupled from the API.
-
-  Tests                   **Pytest**,             Tests
-                          **pytest-cov**          unitários/integração e
-                                                  cobertura.
-
-  Code Quality            **Ruff**, **MyPy**      Linting and type
-                                                  checking.
-
-  Infrastructure          **Docker**, **Docker    Packaging and
-                          Compose**               reproducible execution.
-
-  CI                      **GitHub Actions**      Automated test execution.
-  -------------------------------------------------------------------------
-
-Deliberately **excluded** dependencies: Redis, Celery, Kafka, and
-microservices --- there is no concrete operational justification for
-them in the MVP.
-
-------------------------------------------------------------------------
-
-## Architecture
-
-BeaconOps follows a modular architecture with clearly separated
-responsibilities:
-
--   **API** (`api/`): FastAPI routes, Pydantic models, and error
-    handling.
--   **Domain / Core** (`core/`): business rules --- monitors,
-    scheduling, and notifications.
--   **Services** (`services/`): integrations and use cases --- HTTP
-    client and incident detection.
--   **Utilities** (`utils/`): validations (URL, HTTP response), and
-    logging.
--   **Configuration** (`config/`): settings centralizados via variáveis
-    de ambiente.
-
-The scheduling mechanism is decoupled from business logic: monitoring
-operations do not depend on HTTP routes and can be executed by the
-scheduler, tests, or manual calls.
-
-``` mermaid
+```mermaid
 flowchart LR
     subgraph API["API (FastAPI)"]
         R[routes.py]
@@ -1029,11 +255,9 @@ flowchart LR
     NOT --> LOG
 ```
 
-------------------------------------------------------------------------
+#### ⚡ Check Execution Sequence
 
-## Monitoring Workflow
-
-``` mermaid
+```mermaid
 sequenceDiagram
     autonumber
     participant S as Scheduler (APScheduler)
@@ -1044,93 +268,677 @@ sequenceDiagram
     participant N as Notifier (Webhook)
     participant D as Database
 
-    S->>M: triggers check (monitor_id)
-    M->>D: loads monitor configuration
-    M->>V: validates URL and destination (SSRF)
+    S->>M: trigger check (monitor_id)
+    M->>D: load monitor configuration
+    M->>V: validate URL & resolved destination (SSRF)
     alt Invalid URL / prohibited destination
         V-->>M: validation error
-        M->>D: persists check (failure)
+        M->>D: persist check (failure)
+    else Valid URL
+        M->>H: execute HTTP request (timeout, size limit)
+        H-->>M: response (status, latency, body)
+        M->>D: persist check result
+        M->>I: evaluate check outcome
+        I->>D: update monitor state
+        alt available → unavailable
+            I->>N: notify "service unavailable"
+        else unavailable → available
+            I->>N: notify "service recovered"
+        else latency above threshold
+            I->>N: notify "high latency"
+        end
+        N->>D: log delivery result (success/failure)
+    end
+```
+
+<details>
+<summary><strong>📁 Directory Structure (Click to expand)</strong></summary>
+
+```text
+beaconops/
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+├── src/
+│   └── beaconops/
+│       ├── __init__.py
+│       ├── api/
+│       │   ├── __init__.py
+│       │   ├── routes.py
+│       │   └── pydantic_models.py
+│       ├── config/
+│       │   └── settings.py
+│       ├── core/
+│       │   ├── __init__.py
+│       │   ├── monitor.py
+│       │   ├── schedule.py
+│       │   └── notifications.py
+│       ├── services/
+│       │   ├── __init__.py
+│       │   ├── http_client.py
+│       │   └── incident_identification.py
+│       └── utils/
+│           ├── __init__.py
+│           ├── validations.py
+│           └── logging.py
+├── tests/
+│   ├── conftest.py
+│   └── test_main.py
+├── .env.example
+├── .gitignore
+├── CHANGELOG.md
+├── Dockerfile
+├── docker-compose.yml
+├── LICENSE
+├── pyproject.toml
+├── README.md
+└── requirements.txt
+```
+
+</details>
+
+---
+
+<a id="en-quickstart"></a>
+
+### 🚀 Prerequisites, Installation & Configuration
+
+**Prerequisites:** Python **3.11+** (tested on 3.11 & 3.12), updated `pip`, and optional **Docker / Docker Compose**. No external database is required for the MVP (`SQLite` is the default).
+
+<table>
+  <tr>
+    <td width="55%" valign="top">
+      <h4>💻 Local Setup (Development)</h4>
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/YohanVallier/BeaconOps.git
+cd BeaconOps
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate   # Linux/macOS
+# .venv\Scripts\activate    # Windows
+
+# 3. Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+
+# 4. Configure environment variables
+cp .env.example .env
+
+# 5. Start the application (API + Scheduler)
+uvicorn beaconops.api.routes:app --host 0.0.0.0 --port 8000
+```
+
+    </td>
+    <td width="45%" valign="top">
+      <h4>🐳 Docker Compose</h4>
+
+```bash
+# Build and start containers
+docker compose build
+docker compose up -d
+
+# Follow logs
+docker compose logs -f beaconops
+```
+
+      <h4>📖 Interactive OpenAPI Docs</h4>
+      <ul>
+        <li><strong>Swagger UI:</strong> <code>http://localhost:8000/docs</code></li>
+        <li><strong>ReDoc:</strong> <code>http://localhost:8000/redoc</code></li>
+        <li><strong>OpenAPI JSON:</strong> <code>http://localhost:8000/openapi.json</code></li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+#### ⚙️ Key Configuration Notes
+
+All settings are centralized in `src/beaconops/config/settings.py` and read from environment variables (`.env` supported). No secrets are hardcoded.
+
+- Generate a strong random **`BEACONOPS_ADMIN_API_KEY`**:
+  ```bash
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  ```
+- Keep **`BEACONOPS_ALLOW_PRIVATE_TARGETS=false`** in production unless you fully understand SSRF implications.
+- Use **`BEACONOPS_DATABASE_URL`** to switch between SQLite (default) and PostgreSQL.
+
+<details>
+<summary><strong>🔧 Full Environment Variables Reference (21 variables — Click to expand)</strong></summary>
+
+| Variable | Default | Description |
+|---|---|---|
+| `BEACONOPS_ENV` | `development` | Environment: `development`, `test`, `production`. |
+| `BEACONOPS_LOG_LEVEL` | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). |
+| `BEACONOPS_DATABASE_URL` | `sqlite:///./beaconops.db` | SQLAlchemy database URL. |
+| `BEACONOPS_HTTP_TIMEOUT_SECONDS` | `10` | Default timeout for monitoring requests. |
+| `BEACONOPS_HTTP_MAX_RESPONSE_BYTES` | `1048576` | Maximum response body size to read (1 MB). |
+| `BEACONOPS_MAX_CONCURRENT_CHECKS` | `10` | Maximum concurrent checks. |
+| `BEACONOPS_SCHEDULER_ENABLED` | `true` | Enables the background scheduler. |
+| `BEACONOPS_DEFAULT_CHECK_INTERVAL_SECONDS` | `60` | Default interval between checks. |
+| `BEACONOPS_FAILURE_THRESHOLD` | `3` | Consecutive failures required to open an incident. |
+| `BEACONOPS_RECOVERY_THRESHOLD` | `2` | Consecutive successes required to close an incident. |
+| `BEACONOPS_NOTIFICATIONS_ENABLED` | `true` | Enables Webhook notifications. |
+| `BEACONOPS_DEFAULT_WEBHOOK_URL` | *(empty)* | Default Webhook URL when none is configured per monitor. |
+| `BEACONOPS_WEBHOOK_TIMEOUT_SECONDS` | `5` | Webhook delivery timeout. |
+| `BEACONOPS_ALLOW_PRIVATE_TARGETS` | `false` | Allows private/loopback targets (SSRF risk). |
+| `BEACONOPS_ALLOWED_HOSTS` | *(empty)* | Additional explicitly allowed hostnames. |
+| `BEACONOPS_ALLOWED_PORTS` | `80,443` | Allowed ports for monitored endpoints. |
+| `BEACONOPS_MAX_REDIRECTS` | `3` | Maximum number of consecutive redirects followed. |
+| `BEACONOPS_ADMIN_API_KEY` | *(empty)* | API key for administrative endpoints. |
+| `BEACONOPS_HOST` | `0.0.0.0` | Uvicorn server host. |
+| `BEACONOPS_PORT` | `8000` | Uvicorn server port. |
+| `BEACONOPS_RELOAD` | `false` | Enables auto-reload (development only). |
+
+</details>
+
+---
+
+<a id="en-api"></a>
+
+### 🔌 API Endpoints & Usage Examples
+
+> [!IMPORTANT]
+> All administrative endpoints require the `X-API-Key` header matching `BEACONOPS_ADMIN_API_KEY`.
+
+| Category | Method | Route | Description |
+|---|---|---|---|
+| **Health** | `GET` | `/health` | Application health check. |
+| **Monitors** | `POST` | `/monitors` | Creates a new monitor. |
+| **Monitors** | `GET` | `/monitors` | Lists monitors (with filtering and pagination). |
+| **Monitors** | `GET` | `/monitors/{id}` | Retrieves a specific monitor. |
+| **Monitors** | `PATCH` | `/monitors/{id}` | Updates a monitor. |
+| **Monitors** | `DELETE` | `/monitors/{id}` | Deletes a monitor. |
+| **Monitors** | `POST` | `/monitors/{id}/check` | Triggers an immediate manual check. |
+| **Checks** | `GET` | `/monitors/{id}/checks` | Check history (with filtering and pagination). |
+| **Incidents** | `GET` | `/incidents` | Lists incidents (with filtering and pagination). |
+| **Incidents** | `GET` | `/incidents/{id}` | Retrieves a specific incident. |
+| **Metrics** | `GET` | `/monitors/{id}/metrics` | Operational metrics for a monitor. |
+
+**HTTP Status Codes:** `200 OK` · `201 Created` · `204 No Content` · `400 Bad Request` · `401 Unauthorized` · `404 Not Found` · `422 Unprocessable Entity` · `500 Internal Server Error`
+
+<details>
+<summary><strong>💻 cURL Usage Examples (Click to expand)</strong></summary>
+
+**Create a Monitor**
+```bash
+curl -X POST http://localhost:8000/monitors \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY" \
+  -d '{
+    "name": "Example public API",
+    "url": "https://api.example.com/health",
+    "method": "GET",
+    "interval_seconds": 60,
+    "timeout_seconds": 5,
+    "expected_status": 200,
+    "latency_threshold_ms": 800,
+    "active": true
+  }'
+```
+
+**Run a Manual Check**
+```bash
+curl -X POST http://localhost:8000/monitors/1/check \
+  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
+```
+
+**Retrieve Check History**
+```bash
+curl "http://localhost:8000/monitors/1/checks?limit=20&offset=0" \
+  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
+```
+
+**Retrieve Operational Metrics**
+```bash
+curl "http://localhost:8000/monitors/1/metrics?period=24h" \
+  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
+```
+
+**Retrieve Active Incidents**
+```bash
+curl "http://localhost:8000/incidents?status=open" \
+  -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
+```
+
+</details>
+
+---
+
+### 🧪 Testing & Quality Assurance
+
+```bash
+pytest -v                                        # Run full test suite
+pytest --cov=beaconops --cov-report=term-missing # Coverage report
+ruff check src tests                             # Linting
+mypy src                                         # Static type checking
+```
+
+- **Test Coverage:** monitor CRUD & validation, URL & SSRF protection, valid/invalid HTTP responses, timeouts & connection errors, periodic execution & consecutive failures, incident opening/closing, webhook deduplication & failures, historical persistence, and metric calculations.
+- **Zero External Dependencies:** all tests rely on mocks and local HTTP servers (no live credentials required).
+- **Automated CI:** `.github/workflows/tests.yml` runs linting, type checking, and coverage tests on **Python 3.11 & 3.12** on every push and pull request.
+
+---
+
+<a id="en-security"></a>
+
+### 🛡️ Security & Limitations
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🔒 SSRF & API Security Controls</h4>
+      <ul>
+        <li>Strict URL scheme validation (<code>http</code> / <code>https</code> only).</li>
+        <li>Blocks local, private, reserved, and link-local destinations by default.</li>
+        <li>Validates <strong>resolved IP addresses</strong> — not just URL text.</li>
+        <li>Blocks redirects pointing to prohibited internal targets.</li>
+        <li>Port restrictions via <code>BEACONOPS_ALLOWED_PORTS</code>.</li>
+        <li>Mandatory request timeouts and response-size caps.</li>
+        <li>Webhook URLs validated under the exact same SSRF rules.</li>
+        <li>Admin endpoint protection via <code>X-API-Key</code> + zero leaked secrets.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>⚠️ Current MVP Limitations</h4>
+      <ul>
+        <li>Single administrative API key (no multi-user auth yet).</li>
+        <li>No frontend dashboard — exposed as a documented REST API.</li>
+        <li>SQLite default (PostgreSQL supported, MVP primarily validated on SQLite).</li>
+        <li>HTTP Webhook notifications only (other channels on roadmap).</li>
+        <li>Single-process scheduler (no distributed workers in MVP).</li>
+        <li>No TLS certificate or DNS monitoring yet.</li>
+        <li>Metrics strictly reflect persisted data (no forecasts/estimates).</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+> [!WARNING]
+> **Security Strategy Caveat:** Text-based URL checks alone cannot prevent SSRF. BeaconOps mitigates risk via DNS resolution checks, redirect inspection, and private-range blocking, but **cannot guarantee absolute protection** against DNS rebinding, malicious proxies, or overly permissive configs. Always keep `BEACONOPS_ALLOW_PRIVATE_TARGETS=false`, restrict `BEACONOPS_ALLOWED_PORTS`, run in an isolated network when possible, and periodically audit registered monitors.
+
+---
+
+<a id="en-roadmap"></a>
+
+### 🗺️ Roadmap
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h4>🔴 High Priority</h4>
+      <ul>
+        <li>Web dashboard with historical charts.</li>
+        <li>User authentication & management.</li>
+        <li>Extra notification channels (email, Slack, Telegram).</li>
+        <li>Scheduled operational reports.</li>
+      </ul>
+    </td>
+    <td width="33%" valign="top">
+      <h4>🟡 Medium Priority</h4>
+      <ul>
+        <li>TLS certificate & DNS monitoring.</li>
+        <li>Monitor grouping & tags.</li>
+        <li>Incident escalation policies.</li>
+        <li>Advanced metrics (latency percentiles, SLOs).</li>
+      </ul>
+    </td>
+    <td width="33%" valign="top">
+      <h4>🟢 Low Priority</h4>
+      <ul>
+        <li>Expanded & optimized PostgreSQL support.</li>
+        <li>Distributed execution (only when operationally justified).</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+> [!NOTE]
+> Roadmap items are planned future evolutions and are **not implemented** in the current MVP.
+
+### 📄 License
+
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for full terms.
+
+<div align="center">
+
+**BeaconOps** — *Noise-free API observability. Know before your users do.*
+
+[⬆️ Back to top](#top) · [🇧🇷 Ir para a versão em Português](#portugues)
+
+</div>
+
+---
+
+<a id="portugues"></a>
+
+<div align="center">
+
+## 🇧🇷 Documentação em Português
+
+> **Observabilidade de APIs sem ruído. Saiba antes do seu usuário.**
+
+O **BeaconOps** é uma plataforma autogerenciada de monitoramento de disponibilidade e desempenho de APIs e serviços HTTP. Cadastre endpoints, defina critérios de sucesso, execute verificações assíncronas periódicas e receba notificações via Webhook quando algo sair do esperado — com histórico completo, identificação automática de incidentes e indicadores operacionais confiáveis.
+
+<p>
+  <a href="#pt-problema"><kbd>Problema</kbd></a>
+  <a href="#pt-funcionalidades"><kbd>Funcionalidades</kbd></a>
+  <a href="#pt-tecnologias"><kbd>Tecnologias</kbd></a>
+  <a href="#pt-arquitetura"><kbd>Arquitetura</kbd></a>
+  <a href="#pt-instalacao"><kbd>Instalação</kbd></a>
+  <a href="#pt-api"><kbd>API</kbd></a>
+  <a href="#pt-seguranca"><kbd>Segurança</kbd></a>
+  <a href="#pt-roadmap"><kbd>Roadmap</kbd></a>
+</p>
+
+</div>
+
+---
+
+<a id="pt-problema"></a>
+
+### 🎯 Problema Resolvido & Público-Alvo
+
+Equipes técnicas dependem de APIs internas e externas para manter suas aplicações funcionando. Falhas de disponibilidade, lentidão, códigos HTTP inesperados e respostas fora do contrato podem comprometer operações — e, sem monitoramento adequado, só são percebidas quando o usuário final já foi afetado.
+
+<table>
+  <tr>
+    <td width="55%" valign="top">
+      <h4>🔍 O que o BeaconOps Resolve</h4>
+      <ul>
+        <li>Detecta APIs indisponíveis e endpoints com status HTTP inesperados.</li>
+        <li>Identifica aumento de latência e falhas consecutivas antecipadamente.</li>
+        <li>Detecta alterações no comportamento esperado (validação opcional de conteúdo).</li>
+        <li>Registra interrupções temporárias, recuperações e histórico completo.</li>
+        <li>Notifica responsáveis via Webhook HTTP na abertura ou encerramento de incidentes.</li>
+      </ul>
+      <p><em>Projetado para ser <strong>autogerenciado</strong>: você executa, controla e evolui a plataforma sem depender de serviços comerciais externos.</em></p>
+    </td>
+    <td width="45%" valign="top">
+      <h4>👥 Público-Alvo</h4>
+      <ul>
+        <li>Desenvolvedores backend e engenheiros de software.</li>
+        <li>Administradores de sistemas e equipes de infraestrutura / operações.</li>
+        <li>Pequenas empresas e times de tecnologia.</li>
+        <li>Profissionais responsáveis por APIs e integrações críticas.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+---
+
+<a id="pt-funcionalidades"></a>
+
+### ✨ Funcionalidades
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>📡 Gerenciamento de Monitores</h4>
+      <ul>
+        <li>Cadastro, consulta, atualização, ativação/desativação e remoção de endpoints.</li>
+        <li>Configuração de ID, nome, URL, método HTTP, intervalo, timeout, status esperado, limite de latência, validação opcional de conteúdo, estado e data de criação.</li>
+        <li>Validação rigorosa — configurações inválidas são rejeitadas de imediato.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>⏱️ Monitoramento Automático</h4>
+      <ul>
+        <li>Execução periódica dos monitores ativos via <strong>APScheduler</strong>.</li>
+        <li>Verificações concorrentes com limite em <code>BEACONOPS_MAX_CONCURRENT_CHECKS</code>.</li>
+        <li>Tratamento de timeouts, falhas de conexão, erros HTTP e respostas inválidas.</li>
+        <li>Cancelamento seguro de operações e timeouts obrigatórios.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🚨 Identificação de Incidentes</h4>
+      <ul>
+        <li>Detecção de queda por <strong>falhas consecutivas</strong> (<code>BEACONOPS_FAILURE_THRESHOLD</code>).</li>
+        <li><code>disponível → indisponível</code> abre um incidente automaticamente.</li>
+        <li><code>indisponível → disponível</code> encerra o incidente via <code>BEACONOPS_RECOVERY_THRESHOLD</code>.</li>
+        <li>Evita duplicação de incidentes enquanto o serviço já estiver indisponível.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>🔔 Notificações por Webhook</h4>
+      <ul>
+        <li>Webhooks HTTP para <strong>serviço indisponível</strong>, <strong>serviço recuperado</strong>, <strong>latência alta</strong> e mudanças relevantes de estado.</li>
+        <li>Deduplicação de alertas e registro de falhas de entrega.</li>
+        <li>Nenhuma credencial ou dado sensível é exposto desnecessariamente.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🗂️ Histórico e Consultas</h4>
+      <ul>
+        <li>Cada verificação registra monitor, data/hora, resultado, código HTTP, tempo de resposta, erro e diagnóstico.</li>
+        <li>Distinção explícita entre verificações bem-sucedidas e malsucedidas.</li>
+        <li>Consultas com filtros e paginação para histórico, monitores e incidentes.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>📊 Indicadores Operacionais</h4>
+      <ul>
+        <li><strong>Uptime e Downtime:</strong> proporções reais no período consultado.</li>
+        <li><strong>Latência Média e Máxima</strong> das verificações bem-sucedidas.</li>
+        <li><strong>Total de Verificações, Falhas e Incidentes Ativos.</strong></li>
+        <li><strong>Tempo de Recuperação:</strong> intervalo entre abertura e encerramento de cada incidente.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+> [!NOTE]
+> Todas as métricas são calculadas estritamente a partir de dados persistidos — nenhum valor é inventado ou estimado.
+
+#### 🔄 Ciclo de Vida de um Incidente
+
+```mermaid
+stateDiagram-v2
+    [*] --> Saudavel: Monitor criado e ativo
+    Saudavel --> Degradado: Falha detectada (contagem < FAILURE_THRESHOLD)
+    Degradado --> Saudavel: Sucesso (contador zerado)
+    Degradado --> IncidenteAberto: Falhas consecutivas >= FAILURE_THRESHOLD
+    IncidenteAberto --> IncidenteAberto: Novas falhas (sem duplicar incidente)
+    IncidenteAberto --> Recuperando: Sucesso detectado (contagem < RECOVERY_THRESHOLD)
+    Recuperando --> IncidenteAberto: Nova falha (contador zerado)
+    Recuperando --> Saudavel: Sucessos consecutivos >= RECOVERY_THRESHOLD (Incidente Encerrado)
+```
+
+---
+
+<a id="pt-tecnologias"></a>
+
+### 🧰 Tecnologias
+
+| Camada | Tecnologia | Responsabilidade |
+|---|---|---|
+| **Backend** | `FastAPI` | API REST, validação e documentação OpenAPI automática. |
+| **Servidor** | `Uvicorn` | Servidor ASGI de desenvolvimento e produção. |
+| **Validação** | `Pydantic` | Contratos de entrada/saída e configuração. |
+| **Cliente HTTP** | `HTTPX` | Requisições assíncronas com timeouts e limites de corpo. |
+| **Persistência** | `SQLAlchemy` | ORM e abstração de banco (`SQLite` padrão / suporte a `PostgreSQL`). |
+| **Agendamento** | `APScheduler` | Execução periódica desacoplada das rotas HTTP. |
+| **Testes** | `Pytest` · `pytest-cov` | Testes unitários/integração e cobertura de código. |
+| **Qualidade** | `Ruff` · `MyPy` | Lint e verificação estática de tipos. |
+| **Infraestrutura** | `Docker` · `Docker Compose` | Empacotamento e execução reproduzível. |
+| **CI** | `GitHub Actions` | Lint, checagem de tipos e testes automatizados em Python 3.11 e 3.12. |
+
+> [!TIP]
+> **Dependências deliberadamente não incluídas:** Redis, Celery, Kafka e microsserviços — não há justificativa operacional concreta para adicionar essa complexidade ao MVP.
+
+---
+
+<a id="pt-arquitetura"></a>
+
+### 🏗️ Arquitetura & Fluxo de Monitoramento
+
+O BeaconOps segue uma arquitetura modular com agendamento desacoplado da lógica de negócio — as verificações não dependem das rotas HTTP e podem ser executadas pelo scheduler, por testes ou por chamadas manuais:
+
+- **`api/`**: rotas FastAPI, modelos Pydantic e tratamento de erros.
+- **`core/`**: regras de domínio — monitores, agendamento e notificações.
+- **`services/`**: integrações e casos de uso — cliente HTTP assíncrono e identificação de incidentes.
+- **`utils/`**: validações de segurança (URL, SSRF, respostas HTTP) e logging estruturado.
+- **`config/`**: configurações centralizadas via variáveis de ambiente.
+
+```mermaid
+flowchart LR
+    subgraph API["API (FastAPI)"]
+        R[routes.py]
+        M[pydantic_models.py]
+    end
+
+    subgraph Core["Core"]
+        MON[monitor.py]
+        SCH[schedule.py]
+        NOT[notifications.py]
+    end
+
+    subgraph Services["Services"]
+        HC[http_client.py]
+        INC[incident_identification.py]
+    end
+
+    subgraph Utils["Utils"]
+        VAL[validations.py]
+        LOG[logging.py]
+    end
+
+    subgraph Config["Config"]
+        SET[settings.py]
+    end
+
+    subgraph Persistence["Persistência"]
+        DB[(SQLAlchemy / SQLite / PostgreSQL)]
+    end
+
+    R --> MON
+    R --> INC
+    M --> R
+    SCH --> MON
+    MON --> HC
+    MON --> INC
+    MON --> DB
+    INC --> DB
+    INC --> NOT
+    NOT --> HC
+    HC --> VAL
+    MON --> VAL
+    R --> SET
+    SCH --> SET
+    HC --> SET
+    NOT --> SET
+    MON --> LOG
+    HC --> LOG
+    NOT --> LOG
+```
+
+#### ⚡ Sequência de Execução de uma Verificação
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Scheduler (APScheduler)
+    participant M as MonitorService
+    participant V as Validations (SSRF)
+    participant H as HTTPClient (HTTPX)
+    participant I as IncidentIdentifier
+    participant N as Notifier (Webhook)
+    participant D as Database
+
+    S->>M: dispara verificação (monitor_id)
+    M->>D: carrega configuração do monitor
+    M->>V: valida URL e destino resolvido (SSRF)
+    alt URL inválida / destino proibido
+        V-->>M: erro de validação
+        M->>D: persiste verificação (falha)
     else URL válida
-        M->>H: executes request (timeout, limit)
-        H-->>M: result (status, latency, body)
-        M->>D: persists check
-        M->>I: evaluates result
-        I->>D: updates monitor state
-        alt transition available → unavailable
+        M->>H: executa requisição (timeout, limite)
+        H-->>M: resultado (status, latência, corpo)
+        M->>D: persiste verificação
+        M->>I: avalia resultado
+        I->>D: atualiza estado do monitor
+        alt disponível → indisponível
             I->>N: notifica "serviço indisponível"
-        else transition unavailable → available
+        else indisponível → disponível
             I->>N: notifica "serviço recuperado"
         else latência acima do limite
             I->>N: notifica "latência alta"
         end
-        N->>D: records delivery (success/failure)
+        N->>D: registra entrega (sucesso/falha)
     end
 ```
 
-------------------------------------------------------------------------
+<details>
+<summary><strong>📁 Estrutura de Diretórios (Clique para expandir)</strong></summary>
 
-## Directory Structure
+```text
+beaconops/
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+├── src/
+│   └── beaconops/
+│       ├── __init__.py
+│       ├── api/
+│       │   ├── __init__.py
+│       │   ├── routes.py
+│       │   └── pydantic_models.py
+│       ├── config/
+│       │   └── settings.py
+│       ├── core/
+│       │   ├── __init__.py
+│       │   ├── monitor.py
+│       │   ├── schedule.py
+│       │   └── notifications.py
+│       ├── services/
+│       │   ├── __init__.py
+│       │   ├── http_client.py
+│       │   └── incident_identification.py
+│       └── utils/
+│           ├── __init__.py
+│           ├── validations.py
+│           └── logging.py
+├── tests/
+│   ├── conftest.py
+│   └── test_main.py
+├── .env.example
+├── .gitignore
+├── CHANGELOG.md
+├── Dockerfile
+├── docker-compose.yml
+├── LICENSE
+├── pyproject.toml
+├── README.md
+└── requirements.txt
+```
 
-    beaconops/
-    ├── .github/
-    │   └── workflows/
-    │       └── tests.yml
-    ├── src/
-    │   └── beaconops/
-    │       ├── __init__.py
-    │       ├── api/
-    │       │   ├── __init__.py
-    │       │   ├── routes.py
-    │       │   └── pydantic_models.py
-    │       ├── config/
-    │       │   └── settings.py
-    │       ├── core/
-    │       │   ├── __init__.py
-    │       │   ├── monitor.py
-    │       │   ├── schedule.py
-    │       │   └── notifications.py
-    │       ├── services/
-    │       │   ├── __init__.py
-    │       │   ├── http_client.py
-    │       │   └── incident_identification.py
-    │       └── utils/
-    │           ├── __init__.py
-    │           ├── validations.py
-    │           └── logging.py
-    ├── tests/
-    │   ├── conftest.py
-    │   └── test_main.py
-    ├── .env.example
-    ├── .gitignore
-    ├── CHANGELOG.md
-    ├── Dockerfile
-    ├── docker-compose.yml
-    ├── LICENSE
-    ├── pyproject.toml
-    ├── README.md
-    └── requirements.txt
+</details>
 
-------------------------------------------------------------------------
+---
 
-## Prerequisites
+<a id="pt-instalacao"></a>
 
--   **Python 3.11+** (tested with 3.11 and 3.12).
--   Up-to-date **pip**.
--   **Docker** and **Docker Compose** (optional, for containerized
-    execution).
--   No external service is required for the MVP --- SQLite is the
-    default.
+### 🚀 Pré-requisitos, Instalação & Configuração
 
-------------------------------------------------------------------------
+**Pré-requisitos:** Python **3.11+** (testado em 3.11 e 3.12), `pip` atualizado e **Docker / Docker Compose** (opcional). Nenhum banco externo é obrigatório no MVP (`SQLite` é o padrão).
 
-## Installation
+<table>
+  <tr>
+    <td width="55%" valign="top">
+      <h4>💻 Execução Local (Desenvolvimento)</h4>
 
-### Local (recommended for development)
-
-``` bash
+```bash
 # 1. Clone o repositório
-git clone https://github.com/<seu-usuario>/beaconops.git
-cd beaconops
+git clone https://github.com/YohanVallier/BeaconOps.git
+cd BeaconOps
 
 # 2. Crie e ative um ambiente virtual
 python -m venv .venv
@@ -1142,211 +950,111 @@ pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
 
-# 4. Configure o ambiente
+# 4. Configure as variáveis de ambiente
 cp .env.example .env
-# Edite .env conforme necessário (veja a seção de variáveis)
-```
 
-### Docker
-
-``` bash
-docker compose build
-docker compose up -d
-```
-
-------------------------------------------------------------------------
-
-## Configuration
-
-All configuration is centralized in `src/beaconops/config/settings.py`
-and loaded from environment variables (with support for a `.env` file).
-No secrets are hardcoded.
-
-Important notes:
-
--   **`BEACONOPS_ADMIN_API_KEY`** should be generated using a strong,
-    random value:
-
-    ``` bash
-    python -c "import secrets; print(secrets.token_urlsafe(32))"
-    ```
-
--   **`BEACONOPS_ALLOW_PRIVATE_TARGETS`** should remain `false` in
-    production unless you fully understand the SSRF risk.
-
--   **`BEACONOPS_DATABASE_URL`** allows switching between SQLite
-    (default) and PostgreSQL.
-
-------------------------------------------------------------------------
-
-## Environment Variables
-
-  -------------------------------------------------------------------------------------------------
-  Variable                                     Default                      Description
-  -------------------------------------------- ---------------------------- -----------------------
-  `BEACONOPS_ENV`                              `development`                Environment:
-                                                                            `development`, `test`,
-                                                                            `production`.
-
-  `BEACONOPS_LOG_LEVEL`                        `INFO`                       Log level (`DEBUG`,
-                                                                            `INFO`, `WARNING`,
-                                                                            `ERROR`, `CRITICAL`).
-
-  `BEACONOPS_DATABASE_URL`                     `sqlite:///./beaconops.db`   SQLAlchemy database
-                                                                            URL.
-
-  `BEACONOPS_HTTP_TIMEOUT_SECONDS`             `10`                         Default timeout for
-                                                                            monitoring requests.
-
-  `BEACONOPS_HTTP_MAX_RESPONSE_BYTES`          `1048576`                    Maximum response body
-                                                                            size to read.
-
-  `BEACONOPS_MAX_CONCURRENT_CHECKS`            `10`                         Maximum concurrent
-                                                                            checks.
-
-  `BEACONOPS_SCHEDULER_ENABLED`                `true`                       Enables the background
-                                                                            scheduler.
-
-  `BEACONOPS_DEFAULT_CHECK_INTERVAL_SECONDS`   `60`                         Default interval
-                                                                            between checks.
-
-  `BEACONOPS_FAILURE_THRESHOLD`                `3`                          Consecutive failures
-                                                                            required to open an
-                                                                            incident.
-
-  `BEACONOPS_RECOVERY_THRESHOLD`               `2`                          Consecutive successes
-                                                                            required to close an
-                                                                            incident.
-
-  `BEACONOPS_NOTIFICATIONS_ENABLED`            `true`                       Enables Webhook
-                                                                            notifications.
-
-  `BEACONOPS_DEFAULT_WEBHOOK_URL`              *(vazio)*                    Default Webhook when
-                                                                            none is configured for
-                                                                            a monitor.
-
-  `BEACONOPS_WEBHOOK_TIMEOUT_SECONDS`          `5`                          Webhook delivery
-                                                                            timeout.
-
-  `BEACONOPS_ALLOW_PRIVATE_TARGETS`            `false`                      Allows private/loopback
-                                                                            targets (SSRF risk).
-
-  `BEACONOPS_ALLOWED_HOSTS`                    *(vazio)*                    Additional explicitly
-                                                                            allowed hostnames.
-
-  `BEACONOPS_ALLOWED_PORTS`                    `80,443`                     Allowed ports for
-                                                                            monitored endpoints.
-
-  `BEACONOPS_MAX_REDIRECTS`                    `3`                          Maximum number of
-                                                                            consecutive redirects.
-
-  `BEACONOPS_ADMIN_API_KEY`                    *(vazio)*                    API key for
-                                                                            administrative
-                                                                            endpoints.
-
-  `BEACONOPS_HOST`                             `0.0.0.0`                    Uvicorn server host.
-
-  `BEACONOPS_PORT`                             `8000`                       Uvicorn server port.
-
-  `BEACONOPS_RELOAD`                           `false`                      Enables auto-reload
-                                                                            (development only).
-  -------------------------------------------------------------------------------------------------
-
-------------------------------------------------------------------------
-
-## Getting Started
-
-### Local
-
-``` bash
-# Application (API + scheduler)
+# 5. Inicie a aplicação (API + Scheduler)
 uvicorn beaconops.api.routes:app --host 0.0.0.0 --port 8000
 ```
 
-OpenAPI documentation will be available at:
+    </td>
+    <td width="45%" valign="top">
+      <h4>🐳 Docker Compose</h4>
 
--   Swagger UI: `http://localhost:8000/docs`
--   ReDoc: `http://localhost:8000/redoc`
--   OpenAPI JSON: `http://localhost:8000/openapi.json`
-
-### Docker Compose
-
-``` bash
+```bash
+# Construa e suba os containers
+docker compose build
 docker compose up -d
+
+# Acompanhe os logs
 docker compose logs -f beaconops
 ```
 
-------------------------------------------------------------------------
+      <h4>📖 Documentação OpenAPI Interativa</h4>
+      <ul>
+        <li><strong>Swagger UI:</strong> <code>http://localhost:8000/docs</code></li>
+        <li><strong>ReDoc:</strong> <code>http://localhost:8000/redoc</code></li>
+        <li><strong>OpenAPI JSON:</strong> <code>http://localhost:8000/openapi.json</code></li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-## API Endpoints
+#### ⚙️ Pontos de Atenção na Configuração
 
-> All administrative endpoints require the `X-API-Key` header with the
-> value of `BEACONOPS_ADMIN_API_KEY`.
+Toda a configuração fica centralizada em `src/beaconops/config/settings.py` e é lida via variáveis de ambiente (com suporte a `.env`). Nenhum segredo é hardcoded.
 
-### Health
+- Gere uma chave forte e aleatória para **`BEACONOPS_ADMIN_API_KEY`**:
+  ```bash
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  ```
+- Mantenha **`BEACONOPS_ALLOW_PRIVATE_TARGETS=false`** em produção, salvo se compreender plenamente os riscos de SSRF.
+- Use **`BEACONOPS_DATABASE_URL`** para alternar entre SQLite (padrão) e PostgreSQL.
 
-  Method   Route       Description
-  -------- ----------- ---------------------------
-  `GET`    `/health`   Application health check.
+<details>
+<summary><strong>🔧 Referência Completa de Variáveis de Ambiente (21 variáveis — Clique para expandir)</strong></summary>
 
-### Monitors
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `BEACONOPS_ENV` | `development` | Ambiente: `development`, `test`, `production`. |
+| `BEACONOPS_LOG_LEVEL` | `INFO` | Nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). |
+| `BEACONOPS_DATABASE_URL` | `sqlite:///./beaconops.db` | URL SQLAlchemy do banco de dados. |
+| `BEACONOPS_HTTP_TIMEOUT_SECONDS` | `10` | Timeout padrão das requisições de monitoramento. |
+| `BEACONOPS_HTTP_MAX_RESPONSE_BYTES` | `1048576` | Tamanho máximo do corpo lido (1 MB). |
+| `BEACONOPS_MAX_CONCURRENT_CHECKS` | `10` | Concorrência máxima de verificações. |
+| `BEACONOPS_SCHEDULER_ENABLED` | `true` | Habilita o scheduler em background. |
+| `BEACONOPS_DEFAULT_CHECK_INTERVAL_SECONDS` | `60` | Intervalo padrão entre verificações. |
+| `BEACONOPS_FAILURE_THRESHOLD` | `3` | Falhas consecutivas para abrir um incidente. |
+| `BEACONOPS_RECOVERY_THRESHOLD` | `2` | Sucessos consecutivos para encerrar um incidente. |
+| `BEACONOPS_NOTIFICATIONS_ENABLED` | `true` | Habilita notificações por Webhook. |
+| `BEACONOPS_DEFAULT_WEBHOOK_URL` | *(vazio)* | Webhook padrão quando o monitor não define um. |
+| `BEACONOPS_WEBHOOK_TIMEOUT_SECONDS` | `5` | Timeout de entrega de Webhook. |
+| `BEACONOPS_ALLOW_PRIVATE_TARGETS` | `false` | Permite alvos privados/loopback (risco de SSRF). |
+| `BEACONOPS_ALLOWED_HOSTS` | *(vazio)* | Hostnames adicionais explicitamente permitidos. |
+| `BEACONOPS_ALLOWED_PORTS` | `80,443` | Portas permitidas para endpoints monitorados. |
+| `BEACONOPS_MAX_REDIRECTS` | `3` | Máximo de redirecionamentos consecutivos seguidos. |
+| `BEACONOPS_ADMIN_API_KEY` | *(vazio)* | Chave de API para endpoints administrativos. |
+| `BEACONOPS_HOST` | `0.0.0.0` | Host do servidor Uvicorn. |
+| `BEACONOPS_PORT` | `8000` | Porta do servidor Uvicorn. |
+| `BEACONOPS_RELOAD` | `false` | Habilita auto-reload (apenas desenvolvimento). |
 
-  Method     Route                    Description
-  ---------- ------------------------ --------------------------------------------
-  `POST`     `/monitors`              Creates a monitor.
-  `GET`      `/monitors`              Lists monitors (filtering and pagination).
-  `GET`      `/monitors/{id}`         Retrieves a monitor.
-  `PATCH`    `/monitors/{id}`         Updates a monitor.
-  `DELETE`   `/monitors/{id}`         Deletes a monitor.
-  `POST`     `/monitors/{id}/check`   Runs a manual check.
+</details>
 
-### Checks
+---
 
-  -------------------------------------------------------------------------
-  Method                  Route                     Description
-  ----------------------- ------------------------- -----------------------
-  `GET`                   `/monitors/{id}/checks`   Check history
-                                                    (filtering and
-                                                    pagination).
+<a id="pt-api"></a>
 
-  -------------------------------------------------------------------------
+### 🔌 Endpoints da API & Exemplos de Uso
 
-### Incidents
+> [!IMPORTANT]
+> Todos os endpoints administrativos exigem o header `X-API-Key` com o valor configurado em `BEACONOPS_ADMIN_API_KEY`.
 
-  Method   Route               Description
-  -------- ------------------- ---------------------------------------------
-  `GET`    `/incidents`        Lists incidents (filtering and pagination).
-  `GET`    `/incidents/{id}`   Retrieves an incident.
+| Categoria | Método | Rota | Descrição |
+|---|---|---|---|
+| **Saúde** | `GET` | `/health` | Verificação de saúde da aplicação. |
+| **Monitores** | `POST` | `/monitors` | Cria um novo monitor. |
+| **Monitores** | `GET` | `/monitors` | Lista monitores (filtros e paginação). |
+| **Monitores** | `GET` | `/monitors/{id}` | Consulta um monitor específico. |
+| **Monitores** | `PATCH` | `/monitors/{id}` | Atualiza um monitor. |
+| **Monitores** | `DELETE` | `/monitors/{id}` | Remove um monitor. |
+| **Monitores** | `POST` | `/monitors/{id}/check` | Executa uma verificação manual imediata. |
+| **Verificações** | `GET` | `/monitors/{id}/checks` | Histórico de verificações (filtros e paginação). |
+| **Incidentes** | `GET` | `/incidents` | Lista incidentes (filtros e paginação). |
+| **Incidentes** | `GET` | `/incidents/{id}` | Consulta um incidente específico. |
+| **Indicadores** | `GET` | `/monitors/{id}/metrics` | Indicadores operacionais do monitor. |
 
-### Metrics
+**Códigos de Status HTTP:** `200 OK` · `201 Created` · `204 No Content` · `400 Bad Request` · `401 Unauthorized` · `404 Not Found` · `422 Unprocessable Entity` · `500 Internal Server Error`
 
-  Method   Route                      Description
-  -------- -------------------------- ------------------------------
-  `GET`    `/monitors/{id}/metrics`   Monitor operational metrics.
+<details>
+<summary><strong>💻 Exemplos de Uso com cURL (Clique para expandir)</strong></summary>
 
-### Status Codes
-
--   `200 OK` --- success.
--   `201 Created` --- resource created.
--   `204 No Content` --- resource deleted.
--   `400 Bad Request` --- invalid payload.
--   `401 Unauthorized` --- missing or invalid API key.
--   `404 Not Found` --- resource not found.
--   `422 Unprocessable Entity` --- validation error (Pydantic).
--   `500 Internal Server Error` --- unexpected error.
-
-------------------------------------------------------------------------
-
-## Usage Examples
-
-### Create a Monitor
-
-``` bash
+**Criar um monitor**
+```bash
 curl -X POST http://localhost:8000/monitors \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY" \
   -d '{
-    "name": "Example public API",
+    "name": "API pública de exemplo",
     "url": "https://api.exemplo.com/health",
     "method": "GET",
     "interval_seconds": 60,
@@ -1357,158 +1065,133 @@ curl -X POST http://localhost:8000/monitors \
   }'
 ```
 
-### Run a Manual Check
-
-``` bash
+**Executar verificação manual**
+```bash
 curl -X POST http://localhost:8000/monitors/1/check \
   -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
 ```
 
-### Retrieve Check History
-
-``` bash
+**Consultar histórico de verificações**
+```bash
 curl "http://localhost:8000/monitors/1/checks?limit=20&offset=0" \
   -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
 ```
 
-### Retrieve Metrics
-
-``` bash
+**Consultar indicadores operacionais**
+```bash
 curl "http://localhost:8000/monitors/1/metrics?period=24h" \
   -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
 ```
 
-### Retrieve Active Incidents
-
-``` bash
+**Consultar incidentes ativos**
+```bash
 curl "http://localhost:8000/incidents?status=open" \
   -H "X-API-Key: $BEACONOPS_ADMIN_API_KEY"
 ```
 
-------------------------------------------------------------------------
+</details>
 
-## Tests
+---
 
-``` bash
-# Run the full test suite
-pytest -v
+### 🧪 Testes & Garantia de Qualidade
 
-# With coverage
-pytest --cov=beaconops --cov-report=term-missing
-
-# Lint
-ruff check src tests
-
-# Type checking
-mypy src
+```bash
+pytest -v                                        # Executar toda a suíte
+pytest --cov=beaconops --cov-report=term-missing # Relatório de cobertura
+ruff check src tests                             # Lint
+mypy src                                         # Verificação estática de tipos
 ```
 
-The tests cover:
+- **Cobertura dos testes:** cadastro/validação de monitores, validação de URLs e proteção contra SSRF, respostas HTTP válidas e inválidas, timeouts e falhas de conexão, execução periódica e falhas consecutivas, criação/encerramento de incidentes, deduplicação e falhas de Webhook, persistência histórica e cálculo de indicadores.
+- **Sem dependências externas:** os testes usam mocks e servidores HTTP locais (sem credenciais reais).
+- **CI automatizada:** `.github/workflows/tests.yml` executa lint, verificação de tipos e testes com cobertura em **Python 3.11 e 3.12** a cada push e pull request.
 
--   Monitor creation and validation.
--   URL validation and SSRF protection.
--   Successful and invalid HTTP responses.
--   Timeouts and connection failures.
--   Periodic execution and consecutive failures.
--   Incident creation and resolution.
--   Notification deduplication and Webhook failures.
--   Persistence and historical queries.
--   Metric calculations.
+---
 
-Tests **do not depend on external services or real credentials** ---
-they use mocks and local HTTP servers.
+<a id="pt-seguranca"></a>
 
-CI (`.github/workflows/tests.yml`) runs linting, type checking, and
-tests with coverage on Python 3.11 and 3.12 for every push and pull
-request.
+### 🛡️ Segurança & Limitações
 
-------------------------------------------------------------------------
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h4>🔒 Controles de Segurança & Anti-SSRF</h4>
+      <ul>
+        <li>Validação estrita de esquema (apenas <code>http</code> e <code>https</code>).</li>
+        <li>Bloqueio padrão de destinos locais, privados, reservados e link-local.</li>
+        <li>Validação dos <strong>IPs resolvidos</strong> — não apenas do texto da URL.</li>
+        <li>Bloqueio de redirecionamentos para destinos internos proibidos.</li>
+        <li>Restrição de portas via <code>BEACONOPS_ALLOWED_PORTS</code>.</li>
+        <li>Timeouts obrigatórios e limite de tamanho de resposta.</li>
+        <li>Validação de Webhooks sob as mesmas regras contra SSRF.</li>
+        <li>Acesso administrativo protegido por <code>X-API-Key</code> sem vazamento de credenciais.</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h4>⚠️ Limitações Atuais do MVP</h4>
+      <ul>
+        <li>Apenas chave de API administrativa (sem autenticação multiusuário).</li>
+        <li>Sem painel frontend — interface via API REST documentada.</li>
+        <li>SQLite como padrão (PostgreSQL suportado, MVP validado primariamente em SQLite).</li>
+        <li>Notificações apenas via Webhook HTTP (outros canais no roadmap).</li>
+        <li>Scheduler em processo único (sem processamento distribuído no MVP).</li>
+        <li>Sem monitoramento de certificados TLS ou DNS ainda.</li>
+        <li>Métricas refletem apenas dados persistidos (sem projeções/estimativas).</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-## Security
+> [!WARNING]
+> **Ressalva da Estratégia de Segurança:** A validação textual de URLs não basta para impedir SSRF. O BeaconOps mitiga riscos via resolução DNS, inspeção de redirecionamentos e bloqueio de faixas privadas, mas **não oferece proteção absoluta** contra *DNS rebinding*, proxies maliciosos ou configurações permissivas. Mantenha `BEACONOPS_ALLOW_PRIVATE_TARGETS=false`, restrinja `BEACONOPS_ALLOWED_PORTS`, execute em rede isolada quando possível e audite os monitores periodicamente.
 
-BeaconOps makes HTTP requests to addresses configured by users.
-Protection against **Server-Side Request Forgery (SSRF)** is a core
-concern:
+---
 
--   **Strict URL validation**: only `http` and `https` are accepted.
--   **Local, private, reserved, and link-local destinations are
-    blocked** by default (`BEACONOPS_ALLOW_PRIVATE_TARGETS=false`).
--   **Resolved IP validation** --- not just validation of the URL text.
--   **Redirect protection** against prohibited destinations.
--   **Port restrictions** through `BEACONOPS_ALLOWED_PORTS`.
--   **Mandatory timeouts** and **response-size limits**.
--   **Credential protection**: no credentials are sent in notifications.
--   **Webhook validation** using the same SSRF rules.
--   **Access control** for administrative endpoints through `X-API-Key`.
+<a id="pt-roadmap"></a>
 
-### Limitations da estratégia de segurança
+### 🗺️ Roadmap
 
-Text-based URL validation **is not sufficient** to prevent SSRF.
-BeaconOps mitigates risks by considering DNS resolution, redirects, and
-internal destinations, but **does not provide absolute protection**.
-Scenarios such as DNS rebinding, malicious intermediary proxies, or
-permissive administrative settings may bypass these defenses.
-Recommendations:
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h4>🔴 Prioridade Alta</h4>
+      <ul>
+        <li>Painel web com gráficos históricos.</li>
+        <li>Autenticação e gerenciamento de usuários.</li>
+        <li>Canais adicionais de notificação (e-mail, Slack, Telegram).</li>
+        <li>Relatórios periódicos.</li>
+      </ul>
+    </td>
+    <td width="33%" valign="top">
+      <h4>🟡 Prioridade Média</h4>
+      <ul>
+        <li>Monitoramento de certificados TLS e DNS.</li>
+        <li>Agrupamento de monitores.</li>
+        <li>Políticas de escalonamento de incidentes.</li>
+        <li>Métricas avançadas (percentis de latência, SLOs).</li>
+      </ul>
+    </td>
+    <td width="33%" valign="top">
+      <h4>🟢 Prioridade Baixa</h4>
+      <ul>
+        <li>Suporte ampliado e otimizado a PostgreSQL.</li>
+        <li>Processamento distribuído (somente com justificativa operacional concreta).</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
--   Keep `BEACONOPS_ALLOW_PRIVATE_TARGETS=false` in production.
--   Restrict `BEACONOPS_ALLOWED_PORTS` to the minimum necessary.
--   Run the service on an isolated network whenever possible.
--   Periodically audit registered monitors.
+> [!NOTE]
+> As funcionalidades listadas no roadmap são evoluções planejadas e **não estão implementadas** no MVP atual.
 
-------------------------------------------------------------------------
+### 📄 Licença
 
-## Limitations
+Distribuído sob a licença **MIT**. Consulte o arquivo [`LICENSE`](LICENSE) para os termos completos.
 
--   **No multi-user authentication** in the MVP --- administrative API
-    key only.
--   **No frontend dashboard** --- the interface is the documented REST
-    API.
--   **SQLite** is the default; PostgreSQL is supported through
-    `BEACONOPS_DATABASE_URL`, but the MVP was primarily validated with
-    SQLite.
--   **HTTP Webhook notifications only** --- other channels are on the
-    roadmap.
--   **Single-process scheduler** --- distributed processing is not
-    available in the MVP.
--   **No TLS certificate or DNS monitoring** --- planned for the
-    roadmap.
--   **Metrics are calculated from persisted data** --- no estimates or
-    projections are used.
+<div align="center">
 
-------------------------------------------------------------------------
+**BeaconOps** — *Observabilidade de APIs sem ruído. Saiba antes do seu usuário.*
 
-## Roadmap
+[⬆️ Voltar ao topo](#top) · [🇺🇸 Switch to English](#english)
 
-### High Priority
-
--   Web dashboard with historical charts.
--   Authentication and user management.
--   Additional notification channels (email, Slack, Telegram).
--   Periodic reports.
-
-### Medium Priority
-
--   TLS certificate and DNS monitoring.
--   Monitor grouping.
--   Incident escalation policies.
--   Advanced metrics (latency percentiles, SLOs).
-
-### Low Priority
-
--   Expanded and optimized PostgreSQL support.
--   Distributed processing (only with a concrete operational
-    justification).
-
-> Features listadas no roadmap **não estão implementadas** no MVP.
-
-------------------------------------------------------------------------
-
-## License
-
-Distributed under the **MIT** License. See the [LICENSE](LICENSE) file
-for the full terms.
-
-------------------------------------------------------------------------
-
-**BeaconOps** --- *Noise-free API observability. Know before your users
-do.*
+</div>
